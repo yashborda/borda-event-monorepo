@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@import '@pkg/ui/styles';
+
+@theme inline {
+  --font-sans: 'Inter', sans-serif;
+
+  --font-size-h1: 30px;
+  --line-height-h1: 38px;
+  --font-size-h2: 24px;
+  --line-height-h2: 32px;
+  --font-size-h3: 20px;
+  --line-height-h3: 28px;
+  --font-size-h4: 16px;
+  --line-height-h4: 24px;
+  --font-size-h5: 14px;
+  --line-height-h5: 20px;
+
+  --font-size-body-lg: 16px;
+  --line-height-body-lg: 24px;
+  --font-size-body-md: 14px;
+  --line-height-body-md: 20px;
+  --font-size-body-sm: 12px;
+  --line-height-body-sm: 16px;
+  --font-size-body-xs: 10px;
+  --line-height-body-xs: 14px;
+
+  --font-size-label-lg: 14px;
+  --line-height-label-lg: 20px;
+  --font-size-label-md: 12px;
+  --line-height-label-md: 16px;
+  --font-size-label-sm: 10px;
+  --line-height-label-sm: 16px;
+}
+
+/* Headings */
+@utility text-heading-2xl {
+  font-size: var(--font-size-h1);
+  line-height: var(--line-height-h1);
+  font-weight: 700;
+}
+@utility text-heading-xl {
+  font-size: var(--font-size-h2);
+  line-height: var(--line-height-h2);
+  font-weight: 600;
+}
+@utility text-heading-lg {
+  font-size: var(--font-size-h3);
+  line-height: var(--line-height-h3);
+  font-weight: 600;
+}
+@utility text-heading-md {
+  font-size: var(--font-size-h4);
+  line-height: var(--line-height-h4);
+  font-weight: 600;
+}
+@utility text-heading-sm {
+  font-size: var(--font-size-h5);
+  line-height: var(--line-height-h5);
+  font-weight: 600;
+}
+
+/* Body */
+@utility text-body-lg {
+  font-size: var(--font-size-body-lg);
+  line-height: var(--line-height-body-lg);
+}
+@utility text-body-md {
+  font-size: var(--font-size-body-md);
+  line-height: var(--line-height-body-md);
+}
+@utility text-body-sm {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body-sm);
+}
+@utility text-body-xs {
+  font-size: var(--font-size-body-xs);
+  line-height: var(--line-height-body-xs);
+}
+
+/* Labels */
+@utility text-label-lg {
+  font-size: var(--font-size-label-lg);
+  line-height: var(--line-height-label-lg);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+@utility text-label-md {
+  font-size: var(--font-size-label-md);
+  line-height: var(--line-height-label-md);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+@utility text-label-sm {
+  font-size: var(--font-size-label-sm);
+  line-height: var(--line-height-label-sm);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground text-body-md;
+  }
+}

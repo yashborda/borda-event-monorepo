@@ -1,0 +1,156 @@
+@import 'tailwindcss';
+@import '@pkg/ui/styles';
+
+@theme inline {
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-display: var(--font-playfair), 'Playfair Display', serif;
+
+  --font-size-display-1: 56px;
+  --line-height-display-1: 64px;
+  --font-size-display-2: 44px;
+  --line-height-display-2: 52px;
+  --font-size-display-3: 34px;
+  --line-height-display-3: 42px;
+
+  --font-size-h1: 42px;
+  --line-height-h1: 50px;
+  --font-size-h2: 32px;
+  --line-height-h2: 40px;
+  --font-size-h3: 26px;
+  --line-height-h3: 34px;
+  --font-size-h4: 22px;
+  --line-height-h4: 30px;
+  --font-size-h5: 18px;
+  --line-height-h5: 26px;
+  --font-size-h6: 16px;
+  --line-height-h6: 24px;
+
+  --font-size-body-xl: 18px;
+  --line-height-body-xl: 28px;
+  --font-size-body-lg: 16px;
+  --line-height-body-lg: 26px;
+  --font-size-body-md: 14px;
+  --line-height-body-md: 20px;
+  --font-size-body-sm: 12px;
+  --line-height-body-sm: 16px;
+  --font-size-body-xs: 10px;
+  --line-height-body-xs: 14px;
+
+  --font-size-label-md: 12px;
+  --line-height-label-md: 20px;
+  --font-size-label-sm: 10px;
+  --line-height-label-sm: 20px;
+}
+
+/* Display */
+@utility text-display-2xl {
+  font-family: var(--font-display);
+  font-size: var(--font-size-display-1);
+  line-height: var(--line-height-display-1);
+  font-weight: 700;
+}
+@utility text-display-xl {
+  font-family: var(--font-display);
+  font-size: var(--font-size-display-2);
+  line-height: var(--line-height-display-2);
+  font-weight: 500;
+}
+@utility text-display-lg {
+  font-family: var(--font-display);
+  font-size: var(--font-size-display-3);
+  line-height: var(--line-height-display-3);
+  font-weight: 500;
+}
+
+/* Headings */
+@utility text-heading-2xl {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h1);
+  line-height: var(--line-height-h1);
+  font-weight: 700;
+}
+@utility text-heading-xl {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h2);
+  line-height: var(--line-height-h2);
+  font-weight: 700;
+}
+@utility text-heading-lg {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h3);
+  line-height: var(--line-height-h3);
+  font-weight: 600;
+}
+@utility text-heading-md {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h4);
+  line-height: var(--line-height-h4);
+  font-weight: 600;
+}
+@utility text-heading-sm {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h5);
+  line-height: var(--line-height-h5);
+  font-weight: 600;
+}
+@utility text-heading-xs {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-h6);
+  line-height: var(--line-height-h6);
+  font-weight: 600;
+}
+
+/* Body */
+@utility text-body-xl {
+  font-size: var(--font-size-body-xl);
+  line-height: var(--line-height-body-xl);
+}
+@utility text-body-lg {
+  font-size: var(--font-size-body-lg);
+  line-height: var(--line-height-body-lg);
+}
+@utility text-body-md {
+  font-size: var(--font-size-body-md);
+  line-height: var(--line-height-body-md);
+}
+@utility text-body-sm {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body-sm);
+}
+@utility text-body-xs {
+  font-size: var(--font-size-body-xs);
+  line-height: var(--line-height-body-xs);
+}
+
+/* Labels */
+@utility text-label-md {
+  font-size: var(--font-size-label-md);
+  line-height: var(--line-height-label-md);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+@utility text-label-sm {
+  font-size: var(--font-size-label-sm);
+  line-height: var(--line-height-label-sm);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* Layout */
+@utility container {
+  margin-left: auto;
+  margin-right: auto;
+  /* max-width: 1280px; */
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+@layer base {
+  html {
+    scroll-padding-top: 64px;
+  }
+
+  body {
+    @apply bg-background text-foreground text-body-md;
+  }
+}

@@ -1,0 +1,161 @@
+version: "3"
+
+tasks:
+  # ── Dev ──────────────────────────────────────────────────
+  dev:
+    desc: Start all apps in parallel
+    cmds:
+      - pnpm --parallel --filter "./apps/*" dev
+
+  dev:admin:
+    desc: Start admin (Next.js :3001)
+    cmds:
+      - pnpm --filter admin dev
+
+  dev:website:
+    desc: Start website (Next.js :3000)
+    cmds:
+      - pnpm --filter website dev
+
+  dev:backend:
+    desc: Start backend in watch mode (:3002)
+    cmds:
+      - pnpm --filter backend start:dev
+
+  # ── Build ─────────────────────────────────────────────────
+  build:
+    desc: Build all apps
+    cmds:
+      - pnpm --filter "./apps/*" build
+
+  build:admin:
+    desc: Build admin
+    cmds:
+      - pnpm --filter admin build
+
+  build:website:
+    desc: Build website
+    cmds:
+      - pnpm --filter website build
+
+  build:backend:
+    desc: Build backend
+    cmds:
+      - pnpm --filter backend build
+
+  # ── Production Preview ────────────────────────────────────
+  start:
+    desc: Start all apps in production mode (run build first)
+    cmds:
+      - pnpm --parallel --filter "./apps/*" start
+
+  start:admin:
+    desc: Start admin in production mode (:3001)
+    cmds:
+      - pnpm --filter admin start
+
+  start:website:
+    desc: Start website in production mode (:3000)
+    cmds:
+      - pnpm --filter website start
+
+  start:backend:
+    desc: Start backend in production mode (:3002)
+    cmds:
+      - pnpm --filter backend start:prod
+
+  # ── Lint & Type-check ─────────────────────────────────────
+  lint:
+    desc: Lint all packages
+    cmds:
+      - pnpm --recursive lint
+
+  lint:admin:
+    desc: Lint admin
+    cmds:
+      - pnpm --filter admin lint
+
+  lint:website:
+    desc: Lint website
+    cmds:
+      - pnpm --filter website lint
+
+  lint:backend:
+    desc: Lint backend
+    cmds:
+      - pnpm --filter backend lint
+
+  lint:fix:
+    desc: Lint and auto-fix all packages
+    cmds:
+      - pnpm --recursive lint:fix
+
+  lint:fix:admin:
+    desc: Lint and auto-fix admin
+    cmds:
+      - pnpm --filter admin lint:fix
+
+  lint:fix:website:
+    desc: Lint and auto-fix website
+    cmds:
+      - pnpm --filter website lint:fix
+
+  lint:fix:backend:
+    desc: Lint and auto-fix backend
+    cmds:
+      - pnpm --filter backend lint:fix
+
+  type-check:
+    desc: Type-check all packages
+    cmds:
+      - pnpm --recursive type-check
+
+  type-check:admin:
+    desc: Type-check admin
+    cmds:
+      - pnpm --filter admin type-check
+
+  type-check:website:
+    desc: Type-check website
+    cmds:
+      - pnpm --filter website type-check
+
+  type-check:backend:
+    desc: Type-check backend
+    cmds:
+      - pnpm --filter backend type-check
+
+  format:
+    desc: Format all files with Prettier
+    cmds:
+      - pnpm --recursive format
+
+  format:admin:
+    desc: Format admin
+    cmds:
+      - pnpm --filter admin format
+
+  format:website:
+    desc: Format website
+    cmds:
+      - pnpm --filter website format
+
+  format:backend:
+    desc: Format backend
+    cmds:
+      - pnpm --filter backend format
+
+  # ── Install ───────────────────────────────────────────────
+  install:
+    desc: Install all dependencies
+    cmds:
+      - pnpm install
+
+  # ── Clean ─────────────────────────────────────────────────
+  clean:
+    desc: Remove all build artifacts and node_modules
+    cmds:
+      - find . -name "node_modules" -type d -prune -exec rm -rf {} +
+      - find . -name "dist" -type d -prune -exec rm -rf {} +
+      - find . -name ".next" -type d -prune -exec rm -rf {} +
+      - find . -name "*.tsbuildinfo" -delete
