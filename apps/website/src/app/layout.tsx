@@ -90,29 +90,29 @@ export default RootLayout
 const websiteSchema = {
   '@context': 'http://schema.org',
   '@type': 'WebSite',
-  name: 'Frostleaf',
-  url: 'https://frostleaf.com',
+  name: 'Borda Event',
+  url: 'https://bordaevent.com',
   // sameAs: [
-  //   "https://linkedin.com/company/frostleaf",
-  //   "https://x.com/frostleaf",
+  //   "https://linkedin.com/company/bordaevent",
+  //   "https://x.com/bordaevent",
   // ],
 }
 
 const orgSchema = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'Frostleaf',
-  url: 'https://frostleaf.com',
+  name: 'Borda Event',
+  url: 'https://bordaevent.com',
   // Prefer an absolute logo URL. Update if your canonical logo URL differs.
   logo: getAbsoluteUrl(brandBanner.src),
   // sameAs: [
-  //   "https://twitter.com/frostleaf",
-  //   "https://x.com/frostleaf",
-  //   "https://linkedin.com/company/frostleaf",
+  //   "https://twitter.com/bordaevent",
+  //   "https://x.com/bordaevent",
+  //   "https://linkedin.com/company/bordaevent",
   // ],
   foundingDate: '2026',
   description:
-    'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+    'Luxury wedding and event decoration & management in Surat, Gujarat. Planning for an event — elegant, royal, and unforgettable celebrations.',
 }
 
 export const generateMetadata = async (): Promise<Metadata> => ({
@@ -138,7 +138,7 @@ export const generateMetadata = async (): Promise<Metadata> => ({
     ],
   },
   other: {
-    'application-name': 'Frostleaf',
+    'application-name': 'Borda Event',
     'msapplication-TileColor': '#FFFFFF',
     'msapplication-TileImage': mstile144.src,
     'msapplication-square70x70logo': mstile70.src,

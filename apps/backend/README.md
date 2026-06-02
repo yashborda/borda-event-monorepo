@@ -1,4 +1,4 @@
-# Frostleaf Backend
+# Borda Event Backend
 
 NestJS API server. Runs on port **3002**.
 
@@ -15,7 +15,7 @@ NestJS API server. Runs on port **3002**.
 pnpm install
 
 # Create the database
-createdb frostleaf
+createdb borda_event
 
 # Copy and fill in env vars
 cp apps/backend/.env.example apps/backend/.env

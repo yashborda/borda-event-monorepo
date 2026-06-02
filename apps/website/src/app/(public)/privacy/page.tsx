@@ -20,7 +20,7 @@ const PrivacyPage = () => {
             <strong>Last updated: January 1, 2026</strong>
           </p>
           <p>
-            At Frostleaf, we take your privacy seriously. This Privacy Policy
+            At Borda Event, we take your privacy seriously. This Privacy Policy
             explains how we collect, use, disclose, and safeguard your
             information when you visit our website or use our services. Please
             read this policy carefully. If you disagree with its terms, please
@@ -406,9 +406,9 @@ const PrivacyPage = () => {
           <ul>
             <li>
               Email:{' '}
-              <a href="mailto:privacy@frostleaf.com">privacy@frostleaf.com</a>
+              <a href="mailto:privacy@bordaevent.com">privacy@bordaevent.com</a>
             </li>
-            <li>Website: frostleaf.com/contact</li>
+            <li>Website: bordaevent.com/contact</li>
           </ul>
         </RichContent>
       </div>

@@ -31,25 +31,25 @@ const defaultOgImage = {
 }
 
 export const defaultMetadata: Metadata = {
-  title: 'Frostleaf - Technology Consultancy',
+  title: 'Borda Event — Decoration & Management',
   description:
-    'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+    'Luxury wedding and event decoration & management in Surat, Gujarat. Planning for an event — elegant, royal, and unforgettable celebrations.',
   keywords:
-    'monorepo, next.js, react, typescript, tailwind css, ui components, starter kit, frostleaf.com',
+    'event decoration, wedding decoration, event management, wedding planner, luxury weddings, Surat, Gujarat, Borda Event, bordaevent.com',
   openGraph: {
-    title: 'Frostleaf - Technology Consultancy',
+    title: 'Borda Event — Decoration & Management',
     description:
-      'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+      'Luxury wedding and event decoration & management in Surat, Gujarat. Planning for an event — elegant, royal, and unforgettable celebrations.',
     url: siteUrl,
     type: 'website',
     images: defaultOgImage,
   },
   twitter: {
     card: 'summary_large_image',
-    creator: '@frostleaf.com',
-    title: 'Frostleaf - Technology Consultancy',
+    creator: '@bordaevent',
+    title: 'Borda Event — Decoration & Management',
     description:
-      'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+      'Luxury wedding and event decoration & management in Surat, Gujarat. Planning for an event — elegant, royal, and unforgettable celebrations.',
     images: defaultOgImage,
   },
   alternates: {

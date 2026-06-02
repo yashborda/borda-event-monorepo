@@ -1,11 +1,11 @@
-# Frostleaf
+# Borda Event
 
 A pnpm monorepo with two Next.js apps and a NestJS backend.
 
 ## Structure
 
 ```
-frostleaf/
+borda-event/
 ├── apps/
 │   ├── admin/      Next.js 16 — internal admin panel    (:3001)
 │   ├── website/    Next.js 16 — public-facing site      (:3000)

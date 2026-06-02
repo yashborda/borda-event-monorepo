@@ -1,6 +1,6 @@
 # @pkg/ui
 
-Shared UI component library for the Frostleaf monorepo, built with [shadcn/ui](https://ui.shadcn.com).
+Shared UI component library for the Borda Event monorepo, built with [shadcn/ui](https://ui.shadcn.com).
 
 ## Adding a component
 

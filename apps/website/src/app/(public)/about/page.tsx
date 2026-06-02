@@ -4,20 +4,20 @@ const AboutPage = () => {
   return (
     <main className="mx-auto max-w-4xl px-6 py-16">
       <Heading as="h1" size="2xl" className="mb-6">
-        About Frostleaf
+        About Borda Event
       </Heading>
       <p className="text-body-lg text-muted-foreground mb-8">
-        Frostleaf is a monorepo starter kit built for teams that want to ship
-        faster without sacrificing quality. We provide shared UI components,
-        consistent tooling, and sensible defaults so you can focus on what
-        matters.
+        Borda Event is a luxury wedding and event decoration & management
+        studio based in Surat, Gujarat. We craft elegant, royal, and
+        unforgettable celebrations — designed around your story and brought to
+        life with cinematic detail.
       </p>
 
       <Heading className="mb-4">Our mission</Heading>
       <p className="text-muted-foreground mb-8">
-        We believe great developer experience leads to great user experience.
-        Our mission is to eliminate repetitive setup work so every new project
-        starts on a solid foundation.
+        We believe every celebration deserves to feel personal and timeless.
+        Our mission is to blend tradition and modern design so each event we
+        touch becomes an unforgettable experience for you and your guests.
       </p>
 
       <Heading className="mb-6">Team</Heading>

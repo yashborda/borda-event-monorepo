@@ -46,7 +46,7 @@ export class MailService {
       verificationLink,
       logoUrl: this.logoUrl,
     });
-    await this.send({ to: email, subject: 'Welcome to Frostleaf!', html });
+    await this.send({ to: email, subject: 'Welcome to Borda Event!', html });
   }
 
   async sendPasswordResetEmail(
@@ -85,7 +85,8 @@ export class MailService {
       name,
     );
     let html = fs.readFileSync(templatePath, 'utf-8');
-    for (const [key, value] of Object.entries(vars)) {
+    const allVars = { year: String(new Date().getFullYear()), ...vars };
+    for (const [key, value] of Object.entries(allVars)) {
       html = html.replaceAll(`{{${key}}}`, value);
     }
     return html;

@@ -21,13 +21,14 @@ const Home = async () => {
       {/* Hero */}
       <section className="bg-background flex flex-col items-center px-6 py-24 text-center">
         <div className="flex max-w-2xl flex-col items-center gap-6">
-          <Badge variant="secondary">Now in beta</Badge>
+          <Badge variant="secondary">Surat • Gujarat</Badge>
           <Heading as="h1" size="2xl">
-            Build faster with Frostleaf
+            Planning for an event
           </Heading>
           <p className="text-body-lg text-muted-foreground max-w-md">
-            A monorepo starter with shared UI components, consistent tooling,
-            and sensible defaults.
+            Borda Event crafts luxury wedding and event decoration in Surat,
+            Gujarat — elegant, royal, and unforgettable celebrations designed
+            around you.
           </p>
           <div className="flex gap-3">
             {isLoggedIn ? (
@@ -94,11 +95,11 @@ const Home = async () => {
       <section className="px-6 py-16">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-muted-foreground text-body-lg italic">
-            &ldquo;Frostleaf cut our setup time in half. Everything just
-            works.&rdquo;
+            &ldquo;Borda Event turned our wedding into a dream. Every detail
+            was elegant, and every moment unforgettable.&rdquo;
           </p>
           <p className="text-foreground mt-3 font-medium">
-            — A happy developer
+            — A happy couple
           </p>
         </div>
       </section>

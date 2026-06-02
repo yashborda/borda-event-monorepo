@@ -15,7 +15,7 @@ const TermsPage = () => {
             <strong>Last updated: January 1, 2026</strong>
           </p>
           <p>
-            Welcome to Frostleaf. By accessing or using our platform, you agree
+            Welcome to Borda Event. By accessing or using our platform, you agree
             to be bound by these Terms of Service. If you do not agree to all of
             the terms and conditions of this agreement, you may not access or
             use our services.
@@ -25,7 +25,7 @@ const TermsPage = () => {
 
           <h2>1. Acceptance of terms</h2>
           <p>
-            By accessing and using Frostleaf (&quot;Service&quot;), you accept
+            By accessing and using Borda Event (&quot;Service&quot;), you accept
             and agree to be bound by the terms and provisions of this agreement.
             These Terms apply to all visitors, users, and others who access or
             use the Service.
@@ -33,7 +33,7 @@ const TermsPage = () => {
 
           <blockquote>
             These Terms constitute a legally binding agreement between you and
-            Frostleaf. Please read them carefully.
+            Borda Event. Please read them carefully.
           </blockquote>
 
           <h2>2. Eligibility</h2>
@@ -46,7 +46,7 @@ const TermsPage = () => {
             </li>
             <li>Not be barred from receiving services under applicable law</li>
             <li>
-              Not have previously had your account terminated by Frostleaf for
+              Not have previously had your account terminated by Borda Event for
               violations of these Terms
             </li>
           </ul>
@@ -162,7 +162,7 @@ const TermsPage = () => {
           <h2>5. Intellectual property</h2>
           <p>
             The Service and its original content, features, and functionality
-            are owned by Frostleaf and are protected by international copyright,
+            are owned by Borda Event and are protected by international copyright,
             trademark, patent, trade secret, and other intellectual property
             laws.
           </p>
@@ -171,7 +171,7 @@ const TermsPage = () => {
           <p>
             You retain ownership of any content you submit, post, or display
             through the Service (&quot;Your Content&quot;). By submitting Your
-            Content, you grant Frostleaf a worldwide, non-exclusive,
+            Content, you grant Borda Event a worldwide, non-exclusive,
             royalty-free licence to use, reproduce, and distribute it solely for
             the purpose of operating the Service.
           </p>
@@ -190,7 +190,7 @@ const TermsPage = () => {
               Remove any copyright, trademark, or other proprietary notices
             </li>
             <li>
-              Use our trademarks without prior written permission from Frostleaf
+              Use our trademarks without prior written permission from Borda Event
             </li>
           </ol>
 
@@ -282,7 +282,7 @@ const TermsPage = () => {
 
           <h2>9. Limitation of liability</h2>
           <p>
-            In no event shall Frostleaf, its directors, employees, partners,
+            In no event shall Borda Event, its directors, employees, partners,
             agents, suppliers, or affiliates, be liable for any indirect,
             incidental, special, punitive, or consequential damages, including
             but not limited to:
@@ -299,14 +299,14 @@ const TermsPage = () => {
 
           <blockquote>
             Our total liability to you for any claims arising under these Terms
-            shall not exceed the amount you paid to Frostleaf in the twelve
+            shall not exceed the amount you paid to Borda Event in the twelve
             months preceding the claim.
           </blockquote>
 
           <h2>10. Governing law</h2>
           <p>
             These Terms shall be governed by and construed in accordance with
-            the laws of the jurisdiction in which Frostleaf is incorporated,
+            the laws of the jurisdiction in which Borda Event is incorporated,
             without regard to its conflict of law provisions. Any disputes shall
             be resolved in the courts of that jurisdiction.
           </p>
@@ -335,9 +335,9 @@ const TermsPage = () => {
           <ul>
             <li>
               Email:{' '}
-              <a href="mailto:legal@frostleaf.com">legal@frostleaf.com</a>
+              <a href="mailto:legal@bordaevent.com">legal@bordaevent.com</a>
             </li>
-            <li>Website: frostleaf.com/contact</li>
+            <li>Website: bordaevent.com/contact</li>
           </ul>
         </RichContent>
       </div>

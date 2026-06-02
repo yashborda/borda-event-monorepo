@@ -77,8 +77,8 @@ const BlogPage = async ({ searchParams }: Props) => {
   return (
     <main>
       <BlogPageHero
-        title="The Frostleaf Blog"
-        description="Insights, guides, and updates from the Frostleaf team."
+        title="The Borda Event Blog"
+        description="Stories, inspiration, and ideas from the Borda Event team."
       >
         <BlogSearchInput />
       </BlogPageHero>
@@ -118,8 +118,8 @@ export const generateMetadata = async ({
   const canonical = page > 1 ? `/blog?page=${page}` : '/blog'
 
   return getPageSeoMetadata({
-    title: 'Blog — Frostleaf',
-    description: 'Articles, guides, and updates from the Frostleaf team.',
+    title: 'Blog — Borda Event',
+    description: 'Stories, inspiration, and ideas from the Borda Event team.',
     canonical,
   })
 }

@@ -7,7 +7,7 @@ const PublicLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <Link href="/" className="text-foreground text-lg font-bold">
-              Frostleaf
+              Borda Event
             </Link>
             <span className="text-muted-foreground text-sm">Admin Panel</span>
           </div>
@@ -23,7 +23,7 @@ const PublicLayout = ({ children }: { children: React.ReactNode }) => {
       <footer className="border-border border-t py-4">
         <div className="mx-auto max-w-7xl px-6">
           <p className="text-muted-foreground text-sm">
-            &copy; {new Date().getFullYear()} Frostleaf.com &mdash;{' '}
+            &copy; {new Date().getFullYear()} Borda Event &mdash;{' '}
             <Link href="/status" className="hover:text-foreground underline">
               Status
             </Link>

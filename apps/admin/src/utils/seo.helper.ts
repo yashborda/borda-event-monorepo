@@ -31,25 +31,25 @@ const defaultOgImage = {
 }
 
 export const defaultMetadata: Metadata = {
-  title: 'Frostleaf - Technology Consultancy',
+  title: 'Borda Event Admin',
   description:
-    'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+    'Admin panel for Borda Event — Decoration & Management.',
   keywords:
-    'monorepo, next.js, react, typescript, tailwind css, ui components, starter kit, frostleaf.com',
+    'borda event, admin, event management, decoration, dashboard, cms',
   openGraph: {
-    title: 'Frostleaf - Technology Consultancy',
+    title: 'Borda Event Admin',
     description:
-      'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+      'Admin panel for Borda Event — Decoration & Management.',
     url: siteUrl,
     type: 'website',
     images: defaultOgImage,
   },
   twitter: {
     card: 'summary_large_image',
-    creator: '@frostleaf.com',
-    title: 'Frostleaf - Technology Consultancy',
+    creator: '@bordaevent',
+    title: 'Borda Event Admin',
     description:
-      'A monorepo starter with shared UI components, consistent tooling, and sensible defaults.',
+      'Admin panel for Borda Event — Decoration & Management.',
     images: defaultOgImage,
   },
   alternates: {

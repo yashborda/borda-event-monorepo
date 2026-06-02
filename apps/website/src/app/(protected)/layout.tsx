@@ -16,7 +16,7 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
       <aside className="bg-card border-border flex w-60 flex-col border-r">
         <div className="border-border flex h-16 items-center border-b px-6">
           <Link href="/" className="text-foreground text-lg font-bold">
-            Frostleaf
+            Borda Event
           </Link>
         </div>
         <SidebarNav />

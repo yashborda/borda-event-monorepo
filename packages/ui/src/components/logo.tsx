@@ -15,7 +15,7 @@ export const Logo = ({ className, iconOnly = false }: ILogoProps) => {
         height="32"
         viewBox="0 0 44 44"
         fill="none"
-        aria-label="Frostleaf"
+        aria-label="Borda Event"
         className={cn('text-foreground', className)}
       >
         <path
@@ -33,7 +33,7 @@ export const Logo = ({ className, iconOnly = false }: ILogoProps) => {
       height="32"
       viewBox="0 0 153.65222 44.000095"
       fill="none"
-      aria-label="Frostleaf"
+      aria-label="Borda Event"
       className={cn('text-foreground', className)}
     >
       <path

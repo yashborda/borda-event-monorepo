@@ -84,7 +84,7 @@ export const generateMetadata = async (): Promise<Metadata> => ({
     ],
   },
   other: {
-    'application-name': 'Frostleaf',
+    'application-name': 'Borda Event',
     'msapplication-TileColor': '#FFFFFF',
     'msapplication-TileImage': mstile144.src,
     'msapplication-square70x70logo': mstile70.src,
