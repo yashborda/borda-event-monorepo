@@ -20,11 +20,11 @@ export class GoogleWebsiteStrategy extends PassportStrategy(
     private readonly drizzle: DrizzleService,
   ) {
     super({
-      clientID: config.get<string>('WEBSITE_GOOGLE_CLIENT_ID') ?? 'placeholder',
+      clientID: config.get<string>('WEBSITE_GOOGLE_CLIENT_ID') || 'placeholder',
       clientSecret:
-        config.get<string>('WEBSITE_GOOGLE_CLIENT_SECRET') ?? 'placeholder',
+        config.get<string>('WEBSITE_GOOGLE_CLIENT_SECRET') || 'placeholder',
       callbackURL:
-        config.get<string>('WEBSITE_GOOGLE_CALLBACK_URL') ??
+        config.get<string>('WEBSITE_GOOGLE_CALLBACK_URL') ||
         'http://localhost:3000/api/website/auth/google/callback',
       scope: ['email', 'profile'],
     });

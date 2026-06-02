@@ -20,11 +20,11 @@ export class GoogleAdminStrategy extends PassportStrategy(
     private readonly drizzle: DrizzleService,
   ) {
     super({
-      clientID: config.get<string>('ADMIN_GOOGLE_CLIENT_ID') ?? 'placeholder',
+      clientID: config.get<string>('ADMIN_GOOGLE_CLIENT_ID') || 'placeholder',
       clientSecret:
-        config.get<string>('ADMIN_GOOGLE_CLIENT_SECRET') ?? 'placeholder',
+        config.get<string>('ADMIN_GOOGLE_CLIENT_SECRET') || 'placeholder',
       callbackURL:
-        config.get<string>('ADMIN_GOOGLE_CALLBACK_URL') ??
+        config.get<string>('ADMIN_GOOGLE_CALLBACK_URL') ||
         'http://localhost:3001/api/admin/auth/google/callback',
       scope: ['email', 'profile'],
     });
