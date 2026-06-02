@@ -32,7 +32,29 @@ export type IPermissionName =
   | "blogs:revalidate"
   | "blog-categories:revalidate"
   | "blog-tags:revalidate"
-  | "blog-authors:revalidate";
+  | "blog-authors:revalidate"
+  | "services:read"
+  | "services:create"
+  | "services:update"
+  | "services:delete"
+  | "customers:read"
+  | "customers:create"
+  | "customers:update"
+  | "customers:delete"
+  | "bills:read"
+  | "bills:create"
+  | "bills:update"
+  | "bills:delete"
+  | "catalogues:read"
+  | "catalogues:create"
+  | "catalogues:update"
+  | "catalogues:delete"
+  | "inquiries:read"
+  | "inquiries:update"
+  | "social-posts:read"
+  | "social-posts:create"
+  | "social-posts:update"
+  | "social-posts:delete";
 
 export type IPermission = {
   id: string;
