@@ -18,6 +18,16 @@ import { BlogCategoriesModule } from './blog-categories/blog-categories.module.j
 import { BlogAuthorsModule } from './blog-authors/blog-authors.module.js';
 import { BlogTagsModule } from './blog-tags/blog-tags.module.js';
 import { WebsiteBlogModule } from './website-blog/website-blog.module.js';
+import { ServicesModule } from './services/services.module.js';
+import { WebsiteServicesModule } from './website-services/website-services.module.js';
+import { CustomersModule } from './customers/customers.module.js';
+import { BillsModule } from './bills/bills.module.js';
+import { CataloguesModule } from './catalogues/catalogues.module.js';
+import { WebsiteCataloguesModule } from './website-catalogues/website-catalogues.module.js';
+import { InquiriesModule } from './inquiries/inquiries.module.js';
+import { WebsiteInquiriesModule } from './website-inquiries/website-inquiries.module.js';
+import { SocialPostsModule } from './social-posts/social-posts.module.js';
+import { WebsiteSocialPostsModule } from './website-social-posts/website-social-posts.module.js';
 import { TokenCleanupService } from './tasks/token-cleanup.service.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -47,6 +57,16 @@ import { AppService } from './app.service.js';
     BlogAuthorsModule,
     BlogTagsModule,
     WebsiteBlogModule,
+    ServicesModule,
+    WebsiteServicesModule,
+    CustomersModule,
+    BillsModule,
+    CataloguesModule,
+    WebsiteCataloguesModule,
+    InquiriesModule,
+    WebsiteInquiriesModule,
+    SocialPostsModule,
+    WebsiteSocialPostsModule,
   ],
   controllers: [AppController],
   providers: [

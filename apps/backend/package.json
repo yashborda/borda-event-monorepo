@@ -26,6 +26,7 @@
     "db:studio": "drizzle-kit studio",
     "seed": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/seed.ts",
     "seed:blogs": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/blog-seed.ts",
+    "seed:services": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/services-seed.ts",
     "db:reset": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/reset.ts"
   },
   "dependencies": {
