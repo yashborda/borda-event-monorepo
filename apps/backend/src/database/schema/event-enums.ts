@@ -17,3 +17,7 @@ export const socialPlatformEnum = pgEnum('social_platform', [
   'facebook',
   'youtube',
 ]);
+export const serviceVideoTypeEnum = pgEnum('service_video_type', [
+  'instagram',
+  'drive',
+]);

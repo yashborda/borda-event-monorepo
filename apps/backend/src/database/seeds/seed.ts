@@ -430,6 +430,35 @@ const SYSTEM_PERMISSIONS: Array<{
     action: 'delete',
     description: 'Permanently delete social posts',
   },
+  // Service videos permissions
+  {
+    slug: 'service-videos:read',
+    label: 'Read Service Videos',
+    resource: 'service-videos',
+    action: 'read',
+    description: 'View service videos',
+  },
+  {
+    slug: 'service-videos:create',
+    label: 'Create Service Videos',
+    resource: 'service-videos',
+    action: 'create',
+    description: 'Create service videos',
+  },
+  {
+    slug: 'service-videos:update',
+    label: 'Update Service Videos',
+    resource: 'service-videos',
+    action: 'update',
+    description: 'Update and reorder service videos',
+  },
+  {
+    slug: 'service-videos:delete',
+    label: 'Delete Service Videos',
+    resource: 'service-videos',
+    action: 'delete',
+    description: 'Delete service videos',
+  },
 ];
 
 export async function runSeed(db: ReturnType<typeof drizzle>) {

@@ -19,6 +19,7 @@ export * from './blog-tag-relations.table';
 export * from './event-enums';
 export * from './services.table';
 export * from './service-media.table';
+export * from './service-videos.table';
 export * from './customers.table';
 export * from './bills.table';
 export * from './bill-items.table';

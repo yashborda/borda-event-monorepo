@@ -26,6 +26,10 @@ const envSchema = z.object({
   ADMIN_GOOGLE_CLIENT_SECRET: z.string().optional(),
   ADMIN_GOOGLE_CALLBACK_URL: z.string().url().optional(),
 
+  // Google Drive media storage (service account)
+  GOOGLE_DRIVE_KEY_FILE: z.string().optional(),
+  GOOGLE_DRIVE_ROOT_FOLDER_ID: z.string().optional(),
+
   MAIL_HOST: z.string(),
   MAIL_PORT: z.coerce.number().default(465),
   MAIL_USER: z.string(),

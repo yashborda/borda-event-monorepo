@@ -54,7 +54,11 @@ export type IPermissionName =
   | "social-posts:read"
   | "social-posts:create"
   | "social-posts:update"
-  | "social-posts:delete";
+  | "social-posts:delete"
+  | "service-videos:read"
+  | "service-videos:create"
+  | "service-videos:update"
+  | "service-videos:delete";
 
 export type IPermission = {
   id: string;
