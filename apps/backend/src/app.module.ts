@@ -28,6 +28,7 @@ import { InquiriesModule } from './inquiries/inquiries.module.js';
 import { WebsiteInquiriesModule } from './website-inquiries/website-inquiries.module.js';
 import { SocialPostsModule } from './social-posts/social-posts.module.js';
 import { WebsiteSocialPostsModule } from './website-social-posts/website-social-posts.module.js';
+import { ServiceVideosModule } from './service-videos/service-videos.module.js';
 import { TokenCleanupService } from './tasks/token-cleanup.service.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -67,6 +68,7 @@ import { AppService } from './app.service.js';
     WebsiteInquiriesModule,
     SocialPostsModule,
     WebsiteSocialPostsModule,
+    ServiceVideosModule,
   ],
   controllers: [AppController],
   providers: [

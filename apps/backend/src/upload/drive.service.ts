@@ -25,6 +25,13 @@ const ALLOWED_MIME_TYPES = [
   'image/gif',
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/ogg',
+];
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive'];
 
@@ -184,5 +191,60 @@ export class DriveService {
     await this.drizzle.db
       .delete(mediaFiles)
       .where(eq(mediaFiles.id, mediaFileId));
+  }
+
+  /**
+   * Upload a video into the named subfolder, make it publicly readable, and
+   * return its Drive id + an embeddable playable URL. Unlike uploadImage this
+   * does NOT insert a media_files row (service_videos tracks it directly).
+   */
+  async uploadVideo(
+    file: UploadedFile,
+    subfolder: string,
+  ): Promise<{ driveFileId: string; driveUrl: string }> {
+    if (!ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype))
+      throw new BadRequestException(
+        'Invalid video type. Only MP4, WebM, MOV, and OGG are allowed.',
+      );
+    if (file.size > MAX_VIDEO_SIZE)
+      throw new BadRequestException('Video size must not exceed 100 MB.');
+
+    const folderName = subfolder.trim() || 'general';
+    const drive = this.drive();
+    const folderId = await this.findOrCreateSubfolder(folderName);
+
+    const uploaded = await drive.files.create({
+      requestBody: { name: file.originalname, parents: [folderId] },
+      media: { mimeType: file.mimetype, body: Readable.from(file.buffer) },
+      fields: 'id',
+      supportsAllDrives: true,
+    });
+    const driveFileId = uploaded.data.id;
+    if (!driveFileId)
+      throw new InternalServerErrorException('Drive upload failed');
+
+    await drive.permissions.create({
+      fileId: driveFileId,
+      requestBody: { type: 'anyone', role: 'reader' },
+      supportsAllDrives: true,
+    });
+
+    const driveUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+    return { driveFileId, driveUrl };
+  }
+
+  /**
+   * Delete a Drive file directly by its Drive file id (no media_files row).
+   * Used for drive-hosted videos. Ignores "already gone" errors.
+   */
+  async deleteDriveFile(driveFileId: string): Promise<void> {
+    try {
+      await this.drive().files.delete({
+        fileId: driveFileId,
+        supportsAllDrives: true,
+      });
+    } catch {
+      // File may already be gone on Drive; ignore.
+    }
   }
 }
