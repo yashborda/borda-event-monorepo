@@ -31,7 +31,7 @@ const ALLOWED_VIDEO_MIME_TYPES = [
   'video/quicktime',
   'video/ogg',
 ];
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive'];
 
@@ -44,13 +44,40 @@ export class DriveService {
     private readonly drizzle: DrizzleService,
   ) {}
 
-  /** Lazily build an authenticated Drive client from the service-account key. */
+  /**
+   * Lazily build an authenticated Drive client. Prefers OAuth-as-user flow
+   * (uploads land in the human owner's personal Drive, counted against their
+   * quota). Falls back to the service-account key file if OAuth isn't
+   * configured — but note: service accounts have NO storage quota on personal
+   * (non-Workspace) Drives, so service-account auth only works against a
+   * Shared Drive root.
+   */
   private drive(): drive_v3.Drive {
     if (this.client) return this.client;
+
+    const oauthClientId = this.config.get('GOOGLE_OAUTH_CLIENT_ID', {
+      infer: true,
+    });
+    const oauthClientSecret = this.config.get('GOOGLE_OAUTH_CLIENT_SECRET', {
+      infer: true,
+    });
+    const oauthRefreshToken = this.config.get('GOOGLE_OAUTH_REFRESH_TOKEN', {
+      infer: true,
+    });
+
+    if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+      // OAuth2Client auto-refreshes access tokens before each API call using
+      // the long-lived refresh token. No extra plumbing needed.
+      const oauth2 = new google.auth.OAuth2(oauthClientId, oauthClientSecret);
+      oauth2.setCredentials({ refresh_token: oauthRefreshToken });
+      this.client = google.drive({ version: 'v3', auth: oauth2 });
+      return this.client;
+    }
+
     const keyFile = this.config.get('GOOGLE_DRIVE_KEY_FILE', { infer: true });
     if (!keyFile)
       throw new InternalServerErrorException(
-        'GOOGLE_DRIVE_KEY_FILE is not configured',
+        'Neither GOOGLE_OAUTH_* nor GOOGLE_DRIVE_KEY_FILE is configured',
       );
     const auth = new google.auth.GoogleAuth({ keyFile, scopes: DRIVE_SCOPES });
     this.client = google.drive({ version: 'v3', auth });
@@ -207,7 +234,7 @@ export class DriveService {
         'Invalid video type. Only MP4, WebM, MOV, and OGG are allowed.',
       );
     if (file.size > MAX_VIDEO_SIZE)
-      throw new BadRequestException('Video size must not exceed 100 MB.');
+      throw new BadRequestException('Video size must not exceed 500 MB.');
 
     const folderName = subfolder.trim() || 'general';
     const drive = this.drive();
@@ -231,6 +258,23 @@ export class DriveService {
 
     const driveUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
     return { driveFileId, driveUrl };
+  }
+
+  /**
+   * Rename a Drive file in place. The Drive ID stays the same so all stored
+   * URLs (lh3.googleusercontent.com/d/<id>, drive.google.com/file/d/<id>/preview)
+   * keep working — only the display name in Drive changes. Throws on auth /
+   * permission errors so the caller can fail the API request loudly.
+   */
+  async renameFile(driveFileId: string, newName: string): Promise<void> {
+    const trimmed = newName.trim();
+    if (!trimmed)
+      throw new BadRequestException('Name cannot be empty');
+    await this.drive().files.update({
+      fileId: driveFileId,
+      requestBody: { name: trimmed },
+      supportsAllDrives: true,
+    });
   }
 
   /**
