@@ -154,3 +154,69 @@
     @apply bg-background text-foreground text-body-md;
   }
 }
+
+/* ── Borda Event brand palette ───────────────────────────────────────────────
+   Overrides the inherited @pkg/ui semantic tokens for the public marketing
+   site only (admin keeps its own theme). Both :root and .dark are set to the
+   same warm light palette so the brand stays consistent regardless of the
+   user's color-scheme preference. Logo palette: brown / copper / cream / gold. */
+
+:root,
+.dark {
+  --background: #faf6f2; /* warm cream */
+  --foreground: #2b1a18; /* ink (darkest text, never pure black) */
+
+  --primary: #4a2c2a; /* dark brown */
+  --primary-foreground: #faf6f2;
+
+  --secondary: #efe2d8; /* soft copper tint (badges, chips) */
+  --secondary-foreground: #4a2c2a;
+
+  --accent: #a0614a; /* copper / rose brown */
+  --accent-foreground: #faf6f2;
+
+  --card: #ffffff;
+  --card-foreground: #2b1a18;
+
+  --popover: #ffffff;
+  --popover-foreground: #2b1a18;
+
+  --muted: #f1e7de; /* warm muted surface */
+  --muted-foreground: #7a5c50; /* muted brown */
+
+  --border: #e7d8cc; /* warm border */
+  --input: #e7d8cc;
+  --ring: #a0614a; /* copper focus ring */
+}
+
+@theme {
+  --color-brand-brown: #4a2c2a;
+  --color-brand-copper: #a0614a;
+  --color-brand-cream: #faf6f2;
+  --color-brand-gold: #c9944a;
+  --color-brand-ink: #2b1a18;
+}
+
+/* Auto-scrolling testimonials marquee. */
+@keyframes borda-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: borda-marquee 40s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
