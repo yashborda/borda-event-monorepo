@@ -19,7 +19,7 @@ export function useUpload() {
       const formData = new FormData()
       formData.append('file', file)
       return await apiFetch<IMediaFile>(
-        `/api/admin/upload/image?folder=${encodeURIComponent(folder)}`,
+        `/api/admin/upload/drive-image?folder=${encodeURIComponent(folder)}`,
         { method: 'POST', body: formData }
       )
     } catch (err) {

@@ -64,6 +64,21 @@ const refreshAccessToken = (): Promise<string | null> => {
   return _refreshPromise
 }
 
+/**
+ * Build an absolute URL for endpoints that should bypass the Next.js dev
+ * rewrite proxy — primarily large-file uploads (videos). The proxy buffers
+ * multipart bodies and aborts mid-stream above a certain size, surfacing as
+ * Multer "Request aborted" 500s. When NEXT_PUBLIC_BACKEND_DIRECT_URL is set,
+ * callers POST straight to the backend (CORS already permits the admin origin).
+ * When unset, falls back to the relative path (proxy).
+ */
+export const directBackendUrl = (path: string): string => {
+  const base = process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL
+  if (!base) return path
+  // Strip trailing slash on base, leading slash on path so we don't double up.
+  return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
+}
+
 export const apiFetch = async <T>(
   path: string,
   options: IFetchOptions = {}

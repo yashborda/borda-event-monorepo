@@ -17,6 +17,12 @@ export const env = createEnv({
     NEXT_PUBLIC_ENVIRONMENT: z.enum(['production', 'staging', 'development']),
     NEXT_PUBLIC_SITE_URL: z.string().url(),
     NEXT_PUBLIC_GOOGLE_AUTH_URL: z.string().default('/api/admin/auth/google'),
+    // When set (e.g. http://localhost:3002 in dev), large-file uploads (videos)
+    // POST directly to the backend instead of going through the Next.js dev
+    // rewrite proxy, which buffers and drops multipart bodies over a certain
+    // size with a "Request aborted" error. Empty/unset = use proxy (same-origin
+    // /api paths). Backend CORS already allows the admin origin.
+    NEXT_PUBLIC_BACKEND_DIRECT_URL: z.string().default(''),
   },
 
   /*
@@ -30,5 +36,6 @@ export const env = createEnv({
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_GOOGLE_AUTH_URL: process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL,
+    NEXT_PUBLIC_BACKEND_DIRECT_URL: process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL,
   },
 })
