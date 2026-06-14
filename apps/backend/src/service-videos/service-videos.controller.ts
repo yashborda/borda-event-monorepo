@@ -19,6 +19,7 @@ import { RequirePermissions } from '../auth/common/decorators/require-permission
 import { ServiceVideosService } from './service-videos.service.js';
 import { CreateServiceVideoDto } from './dto/create-service-video.dto.js';
 import { ReorderServiceVideosDto } from './dto/reorder-service-videos.dto.js';
+import { RenameServiceVideoDto } from './dto/rename-service-video.dto.js';
 
 @Controller('admin/services/:serviceId/videos')
 @UseGuards(AuthGuard('admin-jwt'), PermissionsGuard)
@@ -52,6 +53,25 @@ export class ServiceVideosController {
     @Body() dto: ReorderServiceVideosDto,
   ) {
     return this.serviceVideosService.reorder(serviceId, dto.items);
+  }
+
+  @Patch(':videoId/featured')
+  @RequirePermissions('service-videos:update')
+  setVideoFeatured(
+    @Param('serviceId') serviceId: string,
+    @Param('videoId') videoId: string,
+  ) {
+    return this.serviceVideosService.setFeatured(videoId, serviceId);
+  }
+
+  @Patch(':videoId/name')
+  @RequirePermissions('service-videos:update')
+  renameVideo(
+    @Param('serviceId') serviceId: string,
+    @Param('videoId') videoId: string,
+    @Body() dto: RenameServiceVideoDto,
+  ) {
+    return this.serviceVideosService.rename(videoId, serviceId, dto.title);
   }
 
   @Delete(':videoId')

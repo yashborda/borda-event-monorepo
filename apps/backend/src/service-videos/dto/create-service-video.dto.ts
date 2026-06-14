@@ -15,4 +15,9 @@ export class CreateServiceVideoDto {
   @IsOptional()
   @IsUUID()
   thumbnailId?: string;
+
+  // Optional theme to group the video under. Null/omitted = service-level video.
+  @IsOptional()
+  @IsUUID()
+  themeId?: string;
 }

@@ -21,13 +21,15 @@ import { DrizzleService } from '../database/drizzle.service.js';
 import { adminUsers } from '../database/schema/admin-users.table.js';
 import { mediaFiles } from '../database/schema/media-files.table.js';
 import { serviceMedia } from '../database/schema/service-media.table.js';
+import { serviceThemes } from '../database/schema/service-themes.table.js';
+import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { services } from '../database/schema/services.table.js';
 import { generateSlug } from '../common/utils/slug.util.js';
 import { RevalidationService } from '../common/services/revalidation.service.js';
 import { UploadService } from '../upload/upload.service.js';
+import { DriveService } from '../upload/drive.service.js';
 import type { CreateServiceDto } from './dto/create-service.dto.js';
 import type { UpdateServiceDto } from './dto/update-service.dto.js';
-import type { AttachServiceMediaDto } from './dto/attach-service-media.dto.js';
 import type { ReorderServiceMediaDto } from './dto/reorder-service-media.dto.js';
 
 function mediaObject(
@@ -57,6 +59,7 @@ export class ServicesService {
     private readonly drizzle: DrizzleService,
     private readonly revalidationService: RevalidationService,
     private readonly uploadService: UploadService,
+    private readonly driveService: DriveService,
   ) {}
 
   async listAll(
@@ -222,7 +225,10 @@ export class ServicesService {
 
     if (!s) throw new NotFoundException('Service not found');
 
-    const media = await this.fetchServiceMedia(id);
+    const [media, themes] = await Promise.all([
+      this.fetchServiceMedia(id),
+      this.fetchServiceThemes(id),
+    ]);
 
     return {
       id: s.id,
@@ -249,6 +255,7 @@ export class ServicesService {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       media,
+      themes,
     };
   }
 
@@ -308,7 +315,9 @@ export class ServicesService {
       dto.coverImageId !== existing.coverImageId &&
       existing.coverImageId
     ) {
-      await this.uploadService.deleteFile(existing.coverImageId);
+      // driveService.deleteFile drops the Drive file (if any) + the media_files
+      // row; safe to call for both Drive-backed and legacy local media.
+      await this.driveService.deleteFile(existing.coverImageId);
     }
 
     await this.drizzle.db
@@ -399,7 +408,7 @@ export class ServicesService {
     await this.drizzle.db.delete(services).where(eq(services.id, id));
 
     if (service.coverImageId) {
-      await this.uploadService.deleteFile(service.coverImageId);
+      await this.driveService.deleteFile(service.coverImageId);
     }
 
     this.revalidationService.revalidate(['services', `service-${service.slug}`]);
@@ -407,37 +416,174 @@ export class ServicesService {
   }
 
   // ── Service media ──────────────────────────────────────────
-  async attachMedia(id: string, dto: AttachServiceMediaDto) {
+  async attachMedia(
+    id: string,
+    file: Express.Multer.File,
+    themeId?: string,
+  ) {
     const service = await this.getServiceOrThrow(id);
 
-    const [media] = await this.drizzle.db
-      .select({ id: mediaFiles.id })
-      .from(mediaFiles)
-      .where(eq(mediaFiles.id, dto.mediaId))
-      .limit(1);
+    if (themeId) await this.assertThemeBelongsToService(id, themeId);
 
-    if (!media) throw new NotFoundException('Media file not found');
+    // Upload to Drive (subfolder = service name); this inserts the media_files
+    // row (with drive_file_id + url) and returns it.
+    const media = await this.driveService.uploadImage(file, service.name);
 
-    let sortOrder = dto.sortOrder;
-    if (sortOrder === undefined) {
-      const [{ maxOrder }] = await this.drizzle.db
-        .select({
-          maxOrder: sql<number>`COALESCE(MAX(${serviceMedia.sortOrder}), -1)::int`,
-        })
+    const [{ maxOrder }] = await this.drizzle.db
+      .select({
+        maxOrder: sql<number>`COALESCE(MAX(${serviceMedia.sortOrder}), -1)::int`,
+      })
+      .from(serviceMedia)
+      .where(eq(serviceMedia.serviceId, id));
+
+    // First photo uploaded to a theme is automatically the featured one.
+    let isFeatured = false;
+    if (themeId) {
+      const existingFeatured = await this.drizzle.db
+        .select({ mediaId: serviceMedia.mediaId })
         .from(serviceMedia)
-        .where(eq(serviceMedia.serviceId, id));
-      sortOrder = maxOrder + 1;
+        .where(
+          and(
+            eq(serviceMedia.themeId, themeId),
+            eq(serviceMedia.isFeatured, true),
+          ),
+        )
+        .limit(1);
+      if (existingFeatured.length === 0) isFeatured = true;
+    }
+
+    await this.drizzle.db.insert(serviceMedia).values({
+      serviceId: id,
+      mediaId: media.id,
+      themeId: themeId ?? null,
+      isFeatured,
+      sortOrder: maxOrder + 1,
+    });
+
+    const result = await this.findOne(id);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
+    return result;
+  }
+
+  /**
+   * Mark a media row as featured for its theme. Transactionally unsets any
+   * existing featured row in the same theme, then sets the chosen one. The
+   * media must belong to this service AND be attached to a theme (service-level
+   * media has no concept of "featured" — that's a per-theme decision).
+   */
+  async setMediaFeatured(serviceId: string, mediaId: string) {
+    const service = await this.getServiceOrThrow(serviceId);
+
+    const [row] = await this.drizzle.db
+      .select({ themeId: serviceMedia.themeId })
+      .from(serviceMedia)
+      .where(
+        and(
+          eq(serviceMedia.serviceId, serviceId),
+          eq(serviceMedia.mediaId, mediaId),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new NotFoundException('Media not attached to this service');
+    if (!row.themeId)
+      throw new BadRequestException(
+        'Only media attached to a theme can be featured',
+      );
+
+    await this.drizzle.db.transaction(async (tx) => {
+      await tx
+        .update(serviceMedia)
+        .set({ isFeatured: false })
+        .where(
+          and(
+            eq(serviceMedia.themeId, row.themeId!),
+            eq(serviceMedia.isFeatured, true),
+          ),
+        );
+      await tx
+        .update(serviceMedia)
+        .set({ isFeatured: true })
+        .where(
+          and(
+            eq(serviceMedia.serviceId, serviceId),
+            eq(serviceMedia.mediaId, mediaId),
+          ),
+        );
+    });
+
+    const result = await this.findOne(serviceId);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
+    return result;
+  }
+
+  private async assertThemeBelongsToService(
+    serviceId: string,
+    themeId: string,
+  ) {
+    const [t] = await this.drizzle.db
+      .select({ id: serviceThemes.id })
+      .from(serviceThemes)
+      .where(
+        and(
+          eq(serviceThemes.id, themeId),
+          eq(serviceThemes.serviceId, serviceId),
+        ),
+      )
+      .limit(1);
+    if (!t) throw new BadRequestException('Theme does not belong to this service');
+  }
+
+  /**
+   * Rename a photo attached to a service: updates media_files.original_name +
+   * the Drive file name itself (so the user's Drive stays organised). Drive
+   * rename happens first; if it fails we propagate the error and skip the DB
+   * write to keep the two in sync.
+   */
+  async renameMedia(serviceId: string, mediaId: string, newName: string) {
+    const service = await this.getServiceOrThrow(serviceId);
+
+    const [attached] = await this.drizzle.db
+      .select({ mediaId: serviceMedia.mediaId })
+      .from(serviceMedia)
+      .where(
+        and(
+          eq(serviceMedia.serviceId, serviceId),
+          eq(serviceMedia.mediaId, mediaId),
+        ),
+      )
+      .limit(1);
+    if (!attached)
+      throw new NotFoundException('Media is not attached to this service');
+
+    const [mediaRow] = await this.drizzle.db
+      .select({
+        id: mediaFiles.id,
+        driveFileId: mediaFiles.driveFileId,
+      })
+      .from(mediaFiles)
+      .where(eq(mediaFiles.id, mediaId))
+      .limit(1);
+    if (!mediaRow) throw new NotFoundException('Media file not found');
+
+    const trimmed = newName.trim();
+    if (!trimmed) throw new BadRequestException('Name cannot be empty');
+
+    if (mediaRow.driveFileId) {
+      await this.driveService.renameFile(mediaRow.driveFileId, trimmed);
     }
 
     await this.drizzle.db
-      .insert(serviceMedia)
-      .values({ serviceId: id, mediaId: dto.mediaId, sortOrder })
-      .onConflictDoUpdate({
-        target: [serviceMedia.serviceId, serviceMedia.mediaId],
-        set: { sortOrder },
-      });
+      .update(mediaFiles)
+      .set({ originalName: trimmed })
+      .where(eq(mediaFiles.id, mediaId));
 
-    const result = await this.findOne(id);
+    const result = await this.findOne(serviceId);
     this.revalidationService.revalidate([
       'services',
       `service-${service.slug}`,
@@ -448,18 +594,47 @@ export class ServicesService {
   async detachMedia(id: string, mediaId: string) {
     const service = await this.getServiceOrThrow(id);
 
-    const deleted = await this.drizzle.db
-      .delete(serviceMedia)
+    const [attached] = await this.drizzle.db
+      .select({
+        mediaId: serviceMedia.mediaId,
+        themeId: serviceMedia.themeId,
+        isFeatured: serviceMedia.isFeatured,
+      })
+      .from(serviceMedia)
       .where(
-        and(
-          eq(serviceMedia.serviceId, id),
-          eq(serviceMedia.mediaId, mediaId),
-        ),
+        and(eq(serviceMedia.serviceId, id), eq(serviceMedia.mediaId, mediaId)),
       )
-      .returning();
+      .limit(1);
 
-    if (deleted.length === 0)
+    if (!attached)
       throw new NotFoundException('Media is not attached to this service');
+
+    // Deletes the Drive file (by drive_file_id) + the media_files row; the
+    // service_media junction is removed via ON DELETE cascade.
+    await this.driveService.deleteFile(mediaId);
+
+    // If we just deleted the featured photo for a theme, auto-promote the next
+    // remaining photo in that theme by sortOrder. The user's expectation:
+    // "if one, by default first is feature".
+    if (attached.isFeatured && attached.themeId) {
+      const [next] = await this.drizzle.db
+        .select({ mediaId: serviceMedia.mediaId })
+        .from(serviceMedia)
+        .where(eq(serviceMedia.themeId, attached.themeId))
+        .orderBy(asc(serviceMedia.sortOrder))
+        .limit(1);
+      if (next) {
+        await this.drizzle.db
+          .update(serviceMedia)
+          .set({ isFeatured: true })
+          .where(
+            and(
+              eq(serviceMedia.serviceId, id),
+              eq(serviceMedia.mediaId, next.mediaId),
+            ),
+          );
+      }
+    }
 
     const result = await this.findOne(id);
     this.revalidationService.revalidate([
@@ -529,6 +704,8 @@ export class ServicesService {
         originalName: mediaFiles.originalName,
         mimeType: mediaFiles.mimeType,
         size: mediaFiles.size,
+        themeId: serviceMedia.themeId,
+        isFeatured: serviceMedia.isFeatured,
         sortOrder: serviceMedia.sortOrder,
       })
       .from(serviceMedia)
@@ -543,7 +720,106 @@ export class ServicesService {
       originalName: m.originalName,
       mimeType: m.mimeType,
       size: m.size,
+      themeId: m.themeId,
+      isFeatured: m.isFeatured,
       sortOrder: m.sortOrder,
+    }));
+  }
+
+  /**
+   * Returns each theme with its grouped photos + videos (drive-hosted or
+   * instagram-linked) so the admin edit page can render per-theme galleries
+   * without an extra round-trip. Service-level (themeId === null) media and
+   * videos stay on the top-level `media` array returned by `findOne`.
+   */
+  private async fetchServiceThemes(serviceId: string) {
+    const themeRows = await this.drizzle.db
+      .select()
+      .from(serviceThemes)
+      .where(eq(serviceThemes.serviceId, serviceId))
+      .orderBy(asc(serviceThemes.sortOrder), asc(serviceThemes.createdAt));
+
+    if (themeRows.length === 0) return [];
+
+    const [mediaRows, videoRows] = await Promise.all([
+      this.drizzle.db
+        .select({
+          themeId: serviceMedia.themeId,
+          id: mediaFiles.id,
+          url: mediaFiles.url,
+          folder: mediaFiles.folder,
+          originalName: mediaFiles.originalName,
+          mimeType: mediaFiles.mimeType,
+          size: mediaFiles.size,
+          isFeatured: serviceMedia.isFeatured,
+          sortOrder: serviceMedia.sortOrder,
+        })
+        .from(serviceMedia)
+        .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
+        .where(eq(serviceMedia.serviceId, serviceId))
+        .orderBy(asc(serviceMedia.sortOrder)),
+      this.drizzle.db
+        .select({
+          themeId: serviceVideos.themeId,
+          id: serviceVideos.id,
+          type: serviceVideos.type,
+          title: serviceVideos.title,
+          instagramUrl: serviceVideos.instagramUrl,
+          driveFileId: serviceVideos.driveFileId,
+          driveUrl: serviceVideos.driveUrl,
+          isFeatured: serviceVideos.isFeatured,
+          sortOrder: serviceVideos.sortOrder,
+        })
+        .from(serviceVideos)
+        .where(eq(serviceVideos.serviceId, serviceId))
+        .orderBy(asc(serviceVideos.sortOrder)),
+    ]);
+
+    const mediaByTheme = new Map<string, typeof mediaRows>();
+    for (const m of mediaRows) {
+      if (!m.themeId) continue;
+      const arr = mediaByTheme.get(m.themeId) ?? [];
+      arr.push(m);
+      mediaByTheme.set(m.themeId, arr);
+    }
+
+    const videosByTheme = new Map<string, typeof videoRows>();
+    for (const v of videoRows) {
+      if (!v.themeId) continue;
+      const arr = videosByTheme.get(v.themeId) ?? [];
+      arr.push(v);
+      videosByTheme.set(v.themeId, arr);
+    }
+
+    return themeRows.map((t) => ({
+      id: t.id,
+      serviceId: t.serviceId,
+      name: t.name,
+      description: t.description,
+      price: t.price,
+      sortOrder: t.sortOrder,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+      media: (mediaByTheme.get(t.id) ?? []).map((m) => ({
+        id: m.id,
+        url: m.url,
+        folder: m.folder,
+        originalName: m.originalName,
+        mimeType: m.mimeType,
+        size: m.size,
+        isFeatured: m.isFeatured,
+        sortOrder: m.sortOrder,
+      })),
+      videos: (videosByTheme.get(t.id) ?? []).map((v) => ({
+        id: v.id,
+        type: v.type,
+        title: v.title,
+        instagramUrl: v.instagramUrl,
+        driveFileId: v.driveFileId,
+        driveUrl: v.driveUrl,
+        isFeatured: v.isFeatured,
+        sortOrder: v.sortOrder,
+      })),
     }));
   }
 }
