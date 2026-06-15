@@ -1,5 +1,13 @@
 import type { NextConfig } from 'next'
 
+// Backend URL the `/api/*` rewrite proxies to. In production this is the
+// Render backend URL; in dev it falls back to localhost:3002. Reuses the
+// same env var as the direct-upload bypass (video uploads POST straight
+// to the backend instead of through this proxy) so admins only set ONE
+// URL in Vercel.
+const BACKEND =
+  process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL || 'http://localhost:3002'
+
 const nextConfig: NextConfig = {
   transpilePackages: ['@pkg/ui', '@pkg/types'],
   images: {
@@ -27,7 +35,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3002/api/:path*',
+        destination: `${BACKEND}/api/:path*`,
       },
     ]
   },
