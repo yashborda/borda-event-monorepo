@@ -15,12 +15,18 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit() {
+    // Hosted Postgres (Neon, Supabase, Render Postgres, RDS) requires TLS;
+    // local dev usually doesn't. Opt-in via DB_SSL=true. rejectUnauthorized
+    // is false because Neon's cert chain isn't always in Node's default
+    // trust store on smaller containers — the connection is still encrypted.
+    const useSsl = this.config.get<string>('DB_SSL') === 'true';
     this.pool = new Pool({
       host: this.config.getOrThrow<string>('DB_HOST'),
       port: this.config.getOrThrow<number>('DB_PORT'),
       user: this.config.getOrThrow<string>('DB_USERNAME'),
       password: this.config.getOrThrow<string>('DB_PASSWORD'),
       database: this.config.getOrThrow<string>('DB_NAME'),
+      ssl: useSsl ? { rejectUnauthorized: false } : undefined,
     });
     this.db = drizzle(this.pool, { schema });
   }

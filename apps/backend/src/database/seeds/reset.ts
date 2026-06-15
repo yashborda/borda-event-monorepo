@@ -17,6 +17,9 @@ const DB_CONFIG = {
   user: process.env.DB_USERNAME ?? 'postgres',
   password: process.env.DB_PASSWORD ?? 'password',
   database: process.env.DB_NAME,
+  // Hosted Postgres (Neon/Supabase/RDS) requires TLS; local doesn't.
+  ssl:
+    process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
 };
 
 async function reset() {

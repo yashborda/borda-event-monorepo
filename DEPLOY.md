@@ -13,7 +13,7 @@ Everything lives in [`render.yaml`](render.yaml) at the repo root. You only need
 3. On the project dashboard → **Connection details** → toggle **"Pooled connection"** (recommended for Render's connection limits)
 4. You'll see something like:
    ```
-   postgresql://user:password@ep-xxx-pooler.aws.neon.tech/borda_event
+   postgresql://user:password@ep-xxx-pooler.aws.neon.tech/neondb?sslmode=require
    ```
    Parse it into 5 env vars (you'll paste these into Render in step 2):
    ```
@@ -21,10 +21,19 @@ Everything lives in [`render.yaml`](render.yaml) at the repo root. You only need
    DB_PORT     = 5432
    DB_USERNAME = user
    DB_PASSWORD = password
-   DB_NAME     = borda_event
+   DB_NAME     = neondb
+   DB_SSL      = true            ← already pre-set in render.yaml
    ```
+   `DB_SSL=true` is hardcoded in `render.yaml`'s envVars section, so it gets
+   set automatically — you only need to paste the 4 connection details.
 
 That's it for Neon. The migrations apply automatically on first Render deploy.
+
+> **Already done if you ran this from local:** the 6 migrations + seed (60
+> permissions, Super Admin role, default `admin@admin.com / password` user)
+> have already been applied. The build's `db:migrate` step will run again
+> on Render but is idempotent — it sees the existing
+> `drizzle.__drizzle_migrations` table and skips everything.
 
 ---
 

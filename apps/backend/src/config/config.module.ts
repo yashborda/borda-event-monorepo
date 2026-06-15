@@ -12,6 +12,9 @@ const envSchema = z.object({
   DB_USERNAME: z.string(),
   DB_PASSWORD: z.string(),
   DB_NAME: z.string(),
+  // Opt-in TLS for hosted Postgres (Neon/Supabase/Render Postgres/RDS).
+  // Defaults to off for local Postgres which usually has SSL disabled.
+  DB_SSL: z.string().optional(),
 
   WEBSITE_JWT_ACCESS_SECRET: z.string().min(32),
   WEBSITE_JWT_REFRESH_SECRET: z.string().min(32),
