@@ -28,8 +28,13 @@ services:
     # compile the NestJS app, then apply any pending Drizzle migrations BEFORE
     # the new code goes live. If migrate fails, the deploy is aborted — safer
     # than running it on every cold start.
+    #
+    # We install pnpm globally via npm rather than `corepack enable` because
+    # newer Render Node images (24+, 26+) pre-symlink /usr/bin/pnpm as
+    # read-only, and `corepack enable` tries to unlink + recreate it → EROFS.
+    # `npm install -g` writes to a writable global prefix instead.
     buildCommand: |
-      corepack enable
+      npm install -g pnpm@10.33.0
       pnpm install --frozen-lockfile
       pnpm --filter backend build
       pnpm --filter backend db:migrate

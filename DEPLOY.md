@@ -68,11 +68,16 @@ That's it for Neon. The migrations apply automatically on first Render deploy.
    | `WEBSITE_URL` | Your website's URL (Vercel deploy URL, or temporarily `http://localhost:3000`) |
 
 5. Click **Apply** → Render starts the first build. Watch the logs:
-   - `corepack enable` → enables pnpm
+   - `npm install -g pnpm@10.33.0` → installs pnpm in a writable global prefix
    - `pnpm install --frozen-lockfile` → ~2 minutes (cold cache)
    - `pnpm --filter backend build` → ~1 minute
    - `pnpm --filter backend db:migrate` → migrations 0000 through 0005 apply to Neon
    - Service goes "Live" → URL appears at the top, e.g. `https://borda-event-backend.onrender.com`
+
+   > **Why not `corepack enable`?** Render's Node 24+/26+ images pre-symlink
+   > `/usr/bin/pnpm` as read-only. `corepack enable` tries to unlink that
+   > symlink and replace it with its own shim → fails with EROFS. Using
+   > `npm install -g` puts pnpm in a writable prefix and dodges the conflict.
 
 6. **Set `APP_URL` to that URL.** Go back to the env vars panel, set `APP_URL = https://borda-event-backend.onrender.com`, click **Save & Deploy** to restart with the new value. (Without this, Render-generated absolute URLs in emails/sitemaps point at `http://localhost:3002`.)
 
