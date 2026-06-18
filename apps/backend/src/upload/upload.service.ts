@@ -31,7 +31,7 @@ const ALLOWED_FOLDERS = [
 
 type AllowedFolder = (typeof ALLOWED_FOLDERS)[number];
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150 MB
 
 @Injectable()
 export class UploadService {
@@ -107,7 +107,7 @@ export class UploadService {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('File size must not exceed 5 MB.');
+      throw new BadRequestException('File size must not exceed 150 MB.');
     }
 
     const safeFolder: AllowedFolder = ALLOWED_FOLDERS.includes(

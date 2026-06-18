@@ -24,7 +24,7 @@ const ALLOWED_MIME_TYPES = [
   'image/webp',
   'image/gif',
 ];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150 MB
 const ALLOWED_VIDEO_MIME_TYPES = [
   'video/mp4',
   'video/webm',
@@ -140,7 +140,7 @@ export class DriveService {
         'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.',
       );
     if (file.size > MAX_FILE_SIZE)
-      throw new BadRequestException('File size must not exceed 5 MB.');
+      throw new BadRequestException('File size must not exceed 150 MB.');
 
     const folderName = subfolder.trim() || 'general';
     const drive = this.drive();

@@ -153,7 +153,7 @@ const ProfilePage = () => {
             <div className="flex flex-col gap-0.5">
               <p className="text-heading-sm text-foreground">Profile Photo</p>
               <p className="text-body-sm text-muted-foreground">
-                JPG, PNG, WebP or GIF · Max 5 MB
+                JPG, PNG, WebP or GIF · Max 150 MB
               </p>
             </div>
             <div className="flex items-center gap-2">

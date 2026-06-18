@@ -6,6 +6,7 @@ import { IconBrandWhatsapp, IconMenu2, IconX } from '@tabler/icons-react'
 import Link from 'next/link'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 
 import { waLink } from '@/config/site'
 
@@ -20,6 +21,9 @@ const NAV_LINKS = [
 export const Navbar = () => {
   const [scrolled, setScrolled] = React.useState(false)
   const [open, setOpen] = React.useState(false)
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => setMounted(true), [])
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -34,6 +38,66 @@ export const Navbar = () => {
       document.body.style.overflow = ''
     }
   }, [open])
+
+  const drawer = (
+    <div
+      className={cn(
+        'fixed inset-0 z-60 md:hidden',
+        open ? 'pointer-events-auto' : 'pointer-events-none'
+      )}
+    >
+      {/* backdrop */}
+      <div
+        onClick={() => setOpen(false)}
+        className={cn(
+          'bg-brand-ink/50 absolute inset-0 transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0'
+        )}
+      />
+      {/* panel */}
+      <aside
+        className={cn(
+          'bg-background absolute top-0 right-0 flex h-full w-72 max-w-[80%] flex-col p-6 shadow-xl transition-transform duration-300',
+          open ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <Logo className="h-10 w-auto" />
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setOpen(false)}
+            className="text-brand-ink p-1"
+          >
+            <IconX className="size-6" />
+          </button>
+        </div>
+
+        <nav className="mt-8 flex flex-col gap-1">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setOpen(false)}
+              className="text-brand-ink hover:bg-brand-copper/10 hover:text-brand-copper rounded-md px-3 py-3 text-base font-medium transition-colors"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <Button
+          asChild
+          className="bg-brand-copper hover:bg-brand-copper/85 mt-6 text-white"
+        >
+          <a href={waLink()} target="_blank" rel="noopener noreferrer">
+            <IconBrandWhatsapp className="size-4" />
+            Book Now
+          </a>
+        </Button>
+      </aside>
+    </div>
+  )
 
   return (
     <header
@@ -84,64 +148,10 @@ export const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile drawer */}
-      <div
-        className={cn(
-          'fixed inset-0 z-60 md:hidden',
-          open ? 'pointer-events-auto' : 'pointer-events-none'
-        )}
-      >
-        {/* backdrop */}
-        <div
-          onClick={() => setOpen(false)}
-          className={cn(
-            'bg-brand-ink/50 absolute inset-0 transition-opacity duration-300',
-            open ? 'opacity-100' : 'opacity-0'
-          )}
-        />
-        {/* panel */}
-        <aside
-          className={cn(
-            'bg-background absolute top-0 right-0 flex h-full w-72 max-w-[80%] flex-col p-6 shadow-xl transition-transform duration-300',
-            open ? 'translate-x-0' : 'translate-x-full'
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <Logo className="h-10 w-auto" />
-            <button
-              type="button"
-              aria-label="Close menu"
-              onClick={() => setOpen(false)}
-              className="text-brand-ink p-1"
-            >
-              <IconX className="size-6" />
-            </button>
-          </div>
-
-          <nav className="mt-8 flex flex-col gap-1">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="text-brand-ink hover:bg-brand-copper/10 hover:text-brand-copper rounded-md px-3 py-3 text-base font-medium transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          <Button
-            asChild
-            className="bg-brand-copper hover:bg-brand-copper/85 mt-6 text-white"
-          >
-            <a href={waLink()} target="_blank" rel="noopener noreferrer">
-              <IconBrandWhatsapp className="size-4" />
-              Book Now
-            </a>
-          </Button>
-        </aside>
-      </div>
+      {/* Mobile drawer — portaled to body so it escapes the sticky/backdrop-blur
+          header, which would otherwise become the containing block for the
+          `fixed` overlay and offset it on scroll. */}
+      {mounted && createPortal(drawer, document.body)}
     </header>
   )
 }
