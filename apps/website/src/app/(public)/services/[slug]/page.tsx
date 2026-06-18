@@ -1,5 +1,5 @@
 import type { IServiceDetail, IServiceThemeVideo } from '@pkg/types'
-import { Button } from '@pkg/ui'
+import { Button, cn } from '@pkg/ui'
 import {
   IconBrandWhatsapp,
   IconCheck,
@@ -21,10 +21,7 @@ import { RESOURCE_COVERS, RESOURCE_GALLERY } from '@/content/media'
 import { FEATURED_SERVICES, SERVICES } from '@/content/services'
 
 import { WhatsAppCta } from '../../_components/whatsapp-cta'
-import {
-  type GalleryImage,
-  ServiceGallery,
-} from './_components/service-gallery'
+import { type GalleryImage, PhotoSlider } from './_components/photo-slider'
 import { ThemeVideos } from './_components/theme-videos'
 
 type Props = { params: Promise<{ slug: string }> }
@@ -241,22 +238,43 @@ const ServiceDetailPage = async ({ params }: Props) => {
       {sections.length > 0 && (
         <section className="bg-muted/30 px-6 py-14 md:py-20">
           <div className="mx-auto max-w-6xl space-y-14">
-            {sections.map((section, i) => (
-              <div key={section.key}>
-                <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
-                  {section.title ?? (i === 0 ? 'Gallery' : `Theme ${i + 1}`)}
-                </h2>
-                {section.description && (
-                  <p className="text-muted-foreground text-body-md mt-2 max-w-2xl">
-                    {section.description}
-                  </p>
-                )}
-                <div className="mt-6">
-                  <ServiceGallery images={section.images} />
-                  <ThemeVideos videos={section.videos} />
+            {sections.map((section, i) => {
+              const hasPhotos = section.images.length > 0
+              const hasVideos = section.videos.length > 0
+              const split = hasPhotos && hasVideos
+              return (
+                <div key={section.key}>
+                  <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
+                    {section.title ?? (i === 0 ? 'Gallery' : `Theme ${i + 1}`)}
+                  </h2>
+                  {section.description && (
+                    <p className="text-muted-foreground text-body-md mt-2 max-w-2xl">
+                      {section.description}
+                    </p>
+                  )}
+
+                  {/* Photos (autoplay slider) left, video(s) right — side by side
+                      on every breakpoint. */}
+                  <div
+                    className={cn(
+                      'mt-6 grid items-start gap-4 sm:gap-6',
+                      split && 'grid-cols-2'
+                    )}
+                  >
+                    {hasPhotos && (
+                      <div>
+                        <PhotoSlider images={section.images} />
+                      </div>
+                    )}
+                    {hasVideos && (
+                      <div>
+                        <ThemeVideos videos={section.videos} />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}

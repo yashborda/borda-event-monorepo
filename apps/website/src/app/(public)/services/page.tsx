@@ -3,17 +3,17 @@ import { IconChevronRight } from '@tabler/icons-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { getServiceCoverMap } from '@/lib/services-api'
+import { getServiceCoverMap, getServices } from '@/lib/services-api'
 
 import { getPageSeoMetadata } from '@/utils/seo.helper'
 
-import { resolveCover } from '@/content/media'
+import { RESOURCE_COVERS, resolveCover } from '@/content/media'
 import { FEATURED_SERVICES, SERVICES } from '@/content/services'
 
 import { SectionHeading } from '../_components/section-heading'
 import { WhatsAppCta } from '../_components/whatsapp-cta'
 import { ServiceSpotlight } from './_components/service-spotlight'
-import { ServicesFilterGrid } from './_components/services-filter-grid'
+import { type ServiceGridItem, ServicesGrid } from './_components/services-grid'
 
 export const metadata: Metadata = getPageSeoMetadata({
   canonical: '/services',
@@ -22,10 +22,35 @@ export const metadata: Metadata = getPageSeoMetadata({
     'From intimate gatherings to grand weddings — explore every decoration & event-management service Borda Event offers in Surat, Gujarat.',
 })
 
+/**
+ * Live, active services (admin sort order) with resolved covers. Falls back to
+ * the static catalogue if the backend is unreachable so the page always fills.
+ */
+const buildServices = async (
+  backendCovers: Map<string, string>
+): Promise<ServiceGridItem[]> => {
+  const services = await getServices()
+  if (services.length) {
+    return services.map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      coverUrl: s.coverImage?.url ?? RESOURCE_COVERS[s.slug] ?? null,
+    }))
+  }
+  return SERVICES.map((s) => ({
+    slug: s.slug,
+    name: s.name,
+    coverUrl: resolveCover(s.slug, backendCovers),
+  }))
+}
+
 const ServicesPage = async () => {
   const backendCovers = await getServiceCoverMap()
+  const services = await buildServices(backendCovers)
+
+  // Spotlight covers for the curated featured services.
   const covers: Record<string, string | null> = {}
-  for (const service of [...SERVICES, ...FEATURED_SERVICES]) {
+  for (const service of FEATURED_SERVICES) {
     covers[service.slug] = resolveCover(service.slug, backendCovers)
   }
 
@@ -53,10 +78,10 @@ const ServicesPage = async () => {
         </div>
       </section>
 
-      {/* Filterable grid */}
+      {/* All services grid */}
       <section className="px-6 py-16 md:py-24">
         <div className="mx-auto max-w-6xl">
-          <ServicesFilterGrid covers={covers} />
+          <ServicesGrid services={services} />
         </div>
       </section>
 

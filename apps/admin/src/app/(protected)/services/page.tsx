@@ -71,7 +71,7 @@ const ServicesPage = () => {
   const { data, loading, search, setSearch, setSort, reload, tableProps } =
     useTable<IService>({
       endpoint: '/api/admin/services',
-      defaultSort: { key: 'updatedAt', dir: 'desc' },
+      defaultSort: { key: 'sortOrder', dir: 'asc' },
       defaultPageSize: 10,
       extraParams,
     })

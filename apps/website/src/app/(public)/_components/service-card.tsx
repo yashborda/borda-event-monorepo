@@ -2,12 +2,11 @@ import { IconArrowRight } from '@tabler/icons-react'
 
 import Link from 'next/link'
 
-import type { ServiceItem } from '@/content/services'
-
 import { MediaWithFallback } from './media-with-fallback'
 
 type ServiceCardProps = {
-  service: ServiceItem
+  /** Minimal shape — works for both static catalogue and live backend services. */
+  service: { slug: string; name: string; category?: string }
   /** Resolved cover URL (backend or local resource); null → logo fallback. */
   coverUrl?: string | null
 }
@@ -25,9 +24,11 @@ export const ServiceCard = ({ service, coverUrl }: ServiceCardProps) => (
       className="transition-transform duration-500 group-hover:scale-105"
     />
 
-    <span className="bg-brand-copper text-label-sm absolute top-3 left-3 z-10 rounded-md px-2.5 py-1 font-semibold text-white">
-      {service.category}
-    </span>
+    {service.category && (
+      <span className="bg-brand-copper text-label-sm absolute top-3 left-3 z-10 rounded-md px-2.5 py-1 font-semibold text-white">
+        {service.category}
+      </span>
+    )}
 
     <div className="from-brand-ink/90 via-brand-ink/30 absolute inset-x-0 bottom-0 z-10 bg-linear-to-t to-transparent p-4 pt-12">
       <h3 className="font-display text-lg leading-snug font-semibold text-white">
