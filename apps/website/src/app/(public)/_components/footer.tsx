@@ -15,6 +15,7 @@ import {
   FACEBOOK,
   INSTAGRAM,
   LOCATION,
+  MAPS_URL,
   PHONE,
   SOCIAL_HANDLE,
   TAGLINE,
@@ -128,9 +129,16 @@ export const Footer = () => (
                 {SOCIAL_HANDLE}
               </a>
             </li>
-            <li className="flex items-center gap-2">
-              <IconMapPin className="size-4 shrink-0" />
-              {LOCATION}
+            <li>
+              <a
+                href={MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 transition-colors hover:text-white"
+              >
+                <IconMapPin className="size-4 shrink-0" />
+                {LOCATION}
+              </a>
             </li>
           </ul>
         </div>

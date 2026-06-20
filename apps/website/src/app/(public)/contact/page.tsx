@@ -18,6 +18,7 @@ import {
   FACEBOOK,
   INSTAGRAM,
   LOCATION,
+  MAPS_URL,
   PHONE,
   SOCIAL_HANDLE,
   TEL,
@@ -29,7 +30,7 @@ const CONTACT_LINKS = [
   { Icon: IconBrandWhatsapp, label: 'Chat on WhatsApp', href: waLink() },
   { Icon: IconBrandInstagram, label: SOCIAL_HANDLE, href: INSTAGRAM },
   { Icon: IconBrandFacebook, label: SOCIAL_HANDLE, href: FACEBOOK },
-  { Icon: IconMapPin, label: LOCATION, href: undefined },
+  { Icon: IconMapPin, label: LOCATION, href: MAPS_URL },
 ]
 
 const ContactPage = () => {

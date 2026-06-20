@@ -8,6 +8,8 @@ export const BRAND_NAME = 'Borda Event'
 export const TAGLINE = 'Your Celebration, Our Creation'
 export const OWNER_NAME = 'Nikunj Borda'
 export const LOCATION = 'Surat, Gujarat'
+/** Google Maps link to the Borda Event location. */
+export const MAPS_URL = 'https://maps.app.goo.gl/Lb75a1bL7YLsdSEr5'
 
 /** Display phone (human readable). */
 export const PHONE = '+91 84690 60825'
