@@ -241,6 +241,11 @@ const ServiceDetailPage = async ({ params }: Props) => {
             {sections.map((section, i) => {
               const hasPhotos = section.images.length > 0
               const hasVideos = section.videos.length > 0
+              // With a video we pair a single-photo slider beside it in a
+              // two-column row. With photos only we keep one slider that shows
+              // two photos at a time (stepping one at a time), so the layout
+              // stays balanced without ballooning into one oversized card.
+              const photosOnlyTwoUp = hasPhotos && !hasVideos
               const split = hasPhotos && hasVideos
               return (
                 <div key={section.key}>
@@ -253,8 +258,9 @@ const ServiceDetailPage = async ({ params }: Props) => {
                     </p>
                   )}
 
-                  {/* Photos (autoplay slider) left, video(s) right — side by side
-                      on every breakpoint. */}
+                  {/* With a video: single-photo slider left, video(s) right,
+                      side by side. Without a video: one slider showing two
+                      photos at a time so the row stays balanced. */}
                   <div
                     className={cn(
                       'mt-6 grid items-start gap-4 sm:gap-6',
@@ -263,7 +269,10 @@ const ServiceDetailPage = async ({ params }: Props) => {
                   >
                     {hasPhotos && (
                       <div>
-                        <PhotoSlider images={section.images} />
+                        <PhotoSlider
+                          images={section.images}
+                          perView={photosOnlyTwoUp ? 2 : 1}
+                        />
                       </div>
                     )}
                     {hasVideos && (

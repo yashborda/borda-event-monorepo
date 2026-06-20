@@ -12,47 +12,72 @@ export type GalleryImage = { src: string; alt: string }
 const AUTOPLAY_MS = 3500
 
 /**
- * Autoplaying single-image slider (one photo at a time) with prev/next arrows,
- * dot indicators, and a full-screen lightbox on click. Autoplay pauses while
- * the lightbox is open or the pointer is hovering the slider.
+ * Autoplaying slider with prev/next arrows, dot indicators, and a full-screen
+ * lightbox on click. Autoplay pauses while the lightbox is open or the pointer
+ * is hovering the slider.
+ *
+ * `perView` controls how many photos are visible at once (default 1). A 2-up
+ * slider steps one photo at a time, so consecutive pairs overlap
+ * (1+2 → 2+3 → 3+4 …). Used for themes that have no paired video.
  */
-export const PhotoSlider = ({ images }: { images: GalleryImage[] }) => {
+export const PhotoSlider = ({
+  images,
+  perView = 1,
+}: {
+  images: GalleryImage[]
+  perView?: 1 | 2
+}) => {
   const [index, setIndex] = React.useState(0)
-  const [lightbox, setLightbox] = React.useState(false)
+  // Lightbox tracks an individual photo (-1 = closed) so it can step
+  // per-photo independently of the slider's per-window stepping.
+  const [lightboxIndex, setLightboxIndex] = React.useState(-1)
   const [paused, setPaused] = React.useState(false)
 
+  const lightbox = lightboxIndex >= 0
+  const setLightbox = (open: boolean) => setLightboxIndex(open ? index : -1)
+
   const count = images.length
+  // A 2-up slider with a single photo degrades to a normal full-width slider.
+  const lanes = Math.min(perView, count) as 1 | 2
+  // Last index a window can start at so the final photo stays visible.
+  const maxStart = Math.max(0, count - lanes)
+  const steps = maxStart + 1
   const go = React.useCallback(
-    (dir: number) => setIndex((i) => (i + dir + count) % count),
+    (dir: number) => setIndex((i) => (i + dir + steps) % steps),
+    [steps]
+  )
+  const goLightbox = React.useCallback(
+    (dir: number) => setLightboxIndex((i) => (i + dir + count) % count),
     [count]
   )
 
   // Autoplay — paused on hover or while the lightbox is open.
   React.useEffect(() => {
-    if (count <= 1 || paused || lightbox) return
-    const id = setInterval(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS)
+    if (steps <= 1 || paused || lightbox) return
+    const id = setInterval(() => setIndex((i) => (i + 1) % steps), AUTOPLAY_MS)
     return () => clearInterval(id)
-  }, [count, paused, lightbox])
+  }, [steps, paused, lightbox])
 
   // Lightbox keyboard nav + scroll lock.
   React.useEffect(() => {
     if (!lightbox) return
     document.body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightbox(false)
-      else if (e.key === 'ArrowLeft') go(-1)
-      else if (e.key === 'ArrowRight') go(1)
+      if (e.key === 'Escape') setLightboxIndex(-1)
+      else if (e.key === 'ArrowLeft') goLightbox(-1)
+      else if (e.key === 'ArrowRight') goLightbox(1)
     }
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
     }
-  }, [lightbox, go])
+  }, [lightbox, goLightbox])
 
-  if (!count) return null
+  // Clamp if the image list shrinks below the current window start.
+  if (index > maxStart) setIndex(maxStart)
 
-  const current = images[index]
+  const current = images[lightbox ? lightboxIndex : index]
 
   return (
     <>
@@ -61,29 +86,63 @@ export const PhotoSlider = ({ images }: { images: GalleryImage[] }) => {
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        <button
-          type="button"
-          onClick={() => setLightbox(true)}
-          aria-label={`Enlarge photo ${index + 1} of ${count}`}
-          className="border-border/60 bg-brand-ink/5 relative block aspect-9/16 w-full overflow-hidden rounded-lg border shadow-sm"
-        >
-          {images.map((img, i) => (
-            <Image
-              key={img.src + i}
-              src={img.src}
-              alt={img.alt}
-              fill
-              sizes="(max-width: 1024px) 50vw, 33vw"
-              priority={i === 0}
-              className={cn(
-                'object-cover transition-opacity duration-700',
-                i === index ? 'opacity-100' : 'opacity-0'
-              )}
-            />
-          ))}
-        </button>
+        {lanes === 2 ? (
+          // 2-up carousel: a sliding track of half-width slides, stepping one
+          // photo per click so consecutive pairs overlap (1+2 → 2+3 → …). Each
+          // slide is its own rounded, bordered card with a gap between the two
+          // visible photos (via per-slide horizontal padding).
+          <div className="relative aspect-square w-full overflow-hidden">
+            <div
+              className="flex h-full transition-transform duration-700 ease-out"
+              style={{ transform: `translateX(-${index * 50}%)` }}
+            >
+              {images.map((img, i) => (
+                <button
+                  key={img.src + i}
+                  type="button"
+                  onClick={() => setLightboxIndex(i)}
+                  aria-label={`Enlarge photo ${i + 1} of ${count}`}
+                  className="h-full w-1/2 shrink-0 px-1.5"
+                >
+                  <div className="border-border/60 bg-brand-ink/5 relative h-full w-full overflow-hidden rounded-lg border shadow-sm">
+                    <Image
+                      src={img.src}
+                      alt={img.alt}
+                      fill
+                      sizes="(max-width: 1024px) 50vw, 33vw"
+                      priority={i < 2}
+                      className="object-cover"
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setLightbox(true)}
+            aria-label={`Enlarge photo ${index + 1} of ${count}`}
+            className="border-border/60 bg-brand-ink/5 relative block aspect-9/16 w-full overflow-hidden rounded-lg border shadow-sm"
+          >
+            {images.map((img, i) => (
+              <Image
+                key={img.src + i}
+                src={img.src}
+                alt={img.alt}
+                fill
+                sizes="(max-width: 1024px) 50vw, 33vw"
+                priority={i === 0}
+                className={cn(
+                  'object-cover transition-opacity duration-700',
+                  i === index ? 'opacity-100' : 'opacity-0'
+                )}
+              />
+            ))}
+          </button>
+        )}
 
-        {count > 1 && (
+        {steps > 1 && (
           <>
             <button
               type="button"
@@ -103,9 +162,9 @@ export const PhotoSlider = ({ images }: { images: GalleryImage[] }) => {
             </button>
 
             <div className="mt-3 flex justify-center gap-1.5">
-              {images.map((img, i) => (
+              {Array.from({ length: steps }, (_, i) => (
                 <button
-                  key={img.src + i}
+                  key={i}
                   type="button"
                   aria-label={`Go to photo ${i + 1}`}
                   aria-current={i === index}
@@ -144,7 +203,7 @@ export const PhotoSlider = ({ images }: { images: GalleryImage[] }) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                go(-1)
+                goLightbox(-1)
               }}
               aria-label="Previous"
               className="absolute left-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:left-6"
@@ -171,7 +230,7 @@ export const PhotoSlider = ({ images }: { images: GalleryImage[] }) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                go(1)
+                goLightbox(1)
               }}
               aria-label="Next"
               className="absolute right-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:right-6"
