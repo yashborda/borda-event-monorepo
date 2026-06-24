@@ -11,23 +11,43 @@ export type GalleryImage = { src: string; alt: string }
 
 const AUTOPLAY_MS = 3500
 
+/** How many photos are visible at each breakpoint. */
+export type PerView = { base: number; sm: number; lg: number }
+
+// Tailwind's `sm` (640px) and `lg` (1024px) breakpoints, mirrored in JS so the
+// slider can compute its lane count (CSS % transforms can't be breakpointed).
+const SM = 640
+const LG = 1024
+
+/** Resolve the active lane count for the current viewport width. */
+const lanesFor = (perView: PerView, width: number): number =>
+  width >= LG ? perView.lg : width >= SM ? perView.sm : perView.base
+
 /**
  * Autoplaying slider with prev/next arrows, dot indicators, and a full-screen
  * lightbox on click. Autoplay pauses while the lightbox is open or the pointer
  * is hovering the slider.
  *
- * `perView` controls how many photos are visible at once (default 1). A 2-up
- * slider steps one photo at a time, so consecutive pairs overlap
- * (1+2 → 2+3 → 3+4 …). Used for themes that have no paired video.
+ * `perView` controls how many photos are visible at once per breakpoint
+ * (default 1 everywhere). A multi-up slider steps one photo at a time, so
+ * consecutive windows overlap (1+2+3 → 2+3+4 …).
  */
 export const PhotoSlider = ({
   images,
-  perView = 1,
+  perView = { base: 1, sm: 1, lg: 1 },
 }: {
   images: GalleryImage[]
-  perView?: 1 | 2
+  perView?: PerView
 }) => {
   const [index, setIndex] = React.useState(0)
+  // Lane count tracks the live viewport width so it can differ per breakpoint.
+  const [vw, setVw] = React.useState(LG)
+  React.useEffect(() => {
+    const onResize = () => setVw(window.innerWidth)
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   // Lightbox tracks an individual photo (-1 = closed) so it can step
   // per-photo independently of the slider's per-window stepping.
   const [lightboxIndex, setLightboxIndex] = React.useState(-1)
@@ -37,8 +57,9 @@ export const PhotoSlider = ({
   const setLightbox = (open: boolean) => setLightboxIndex(open ? index : -1)
 
   const count = images.length
-  // A 2-up slider with a single photo degrades to a normal full-width slider.
-  const lanes = Math.min(perView, count) as 1 | 2
+  // Never show more lanes than we have photos (a 3-up with 1 photo degrades to
+  // a normal full-width slider).
+  const lanes = Math.max(1, Math.min(lanesFor(perView, vw), count))
   // Last index a window can start at so the final photo stays visible.
   const maxStart = Math.max(0, count - lanes)
   const steps = maxStart + 1
@@ -86,15 +107,19 @@ export const PhotoSlider = ({
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        {lanes === 2 ? (
-          // 2-up carousel: a sliding track of half-width slides, stepping one
-          // photo per click so consecutive pairs overlap (1+2 → 2+3 → …). Each
-          // slide is its own rounded, bordered card with a gap between the two
-          // visible photos (via per-slide horizontal padding).
-          <div className="relative aspect-square w-full overflow-hidden">
+        {lanes >= 2 ? (
+          // Multi-up carousel: a sliding track of equal-width slides (100/lanes
+          // %), stepping one photo per click so consecutive windows overlap
+          // (1+2+3 → 2+3+4 …). Each slide is its own rounded, bordered card with
+          // a gap between visible photos (via per-slide horizontal padding).
+          // Lane count is breakpoint-driven, so widths are computed in JS.
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: `${lanes} / 1` }}
+          >
             <div
               className="flex h-full transition-transform duration-700 ease-out"
-              style={{ transform: `translateX(-${index * 50}%)` }}
+              style={{ transform: `translateX(-${(index * 100) / lanes}%)` }}
             >
               {images.map((img, i) => (
                 <button
@@ -102,15 +127,16 @@ export const PhotoSlider = ({
                   type="button"
                   onClick={() => setLightboxIndex(i)}
                   aria-label={`Enlarge photo ${i + 1} of ${count}`}
-                  className="h-full w-1/2 shrink-0 px-1.5"
+                  className="h-full shrink-0 px-1.5"
+                  style={{ width: `${100 / lanes}%` }}
                 >
                   <div className="border-border/60 bg-brand-ink/5 relative h-full w-full overflow-hidden rounded-lg border shadow-sm">
                     <Image
                       src={img.src}
                       alt={img.alt}
                       fill
-                      sizes="(max-width: 1024px) 50vw, 33vw"
-                      priority={i < 2}
+                      sizes="(max-width: 640px) 33vw, (max-width: 1024px) 33vw, 22vw"
+                      priority={i < lanes}
                       className="object-cover"
                     />
                   </div>

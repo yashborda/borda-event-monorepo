@@ -239,12 +239,14 @@ const ServiceDetailPage = async ({ params }: Props) => {
             {sections.map((section, i) => {
               const hasPhotos = section.images.length > 0
               const hasVideos = section.videos.length > 0
-              // With a video we pair a single-photo slider beside it in a
-              // two-column row. With photos only we keep one slider that shows
-              // two photos at a time (stepping one at a time), so the layout
-              // stays balanced without ballooning into one oversized card.
-              const photosOnlyTwoUp = hasPhotos && !hasVideos
+              // Photos only → a 3-up slider at every breakpoint. With a video →
+              // a 2-up photo slider beside the video, stacked on mobile and
+              // side-by-side from `sm` up. Steps one photo at a time so windows
+              // overlap and the layout stays balanced.
               const split = hasPhotos && hasVideos
+              const perView = split
+                ? { base: 2, sm: 2, lg: 2 }
+                : { base: 3, sm: 3, lg: 3 }
               return (
                 <div key={section.key}>
                   <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
@@ -256,20 +258,20 @@ const ServiceDetailPage = async ({ params }: Props) => {
                     </p>
                   )}
 
-                  {/* With a video: single-photo slider left, video(s) right,
-                      side by side. Without a video: one slider showing two
-                      photos at a time so the row stays balanced. */}
+                  {/* With a video: 2-up photo slider + video(s), stacked on
+                      mobile and side by side from `sm` up. Without a video: one
+                      3-up slider so the row stays balanced. */}
                   <div
                     className={cn(
                       'mt-6 grid items-start gap-4 sm:gap-6',
-                      split && 'grid-cols-2'
+                      split && 'sm:grid-cols-2'
                     )}
                   >
                     {hasPhotos && (
                       <div>
                         <PhotoSlider
                           images={section.images}
-                          perView={photosOnlyTwoUp ? 2 : 1}
+                          perView={perView}
                         />
                       </div>
                     )}
