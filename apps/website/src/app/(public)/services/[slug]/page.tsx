@@ -18,7 +18,7 @@ import { getPageSeoMetadata } from '@/utils/seo.helper'
 
 import { TEL, serviceEnquiry } from '@/config/site'
 import { RESOURCE_COVERS, RESOURCE_GALLERY } from '@/content/media'
-import { FEATURED_SERVICES, SERVICES } from '@/content/services'
+import { FEATURED_SERVICES } from '@/content/services'
 
 import { WhatsAppCta } from '../../_components/whatsapp-cta'
 import { type GalleryImage, PhotoSlider } from './_components/photo-slider'
@@ -35,9 +35,8 @@ type ThemeSection = {
 }
 
 export const generateStaticParams = async () => {
-  const backend = await getServiceSlugs()
-  const slugs = new Set<string>([...SERVICES.map((s) => s.slug), ...backend])
-  return Array.from(slugs).map((slug) => ({ slug }))
+  const slugs = await getServiceSlugs()
+  return slugs.map((slug) => ({ slug }))
 }
 
 export const generateMetadata = async ({
@@ -45,12 +44,12 @@ export const generateMetadata = async ({
 }: Props): Promise<Metadata> => {
   const { slug } = await params
   const detail = await getServiceBySlug(slug)
-  const staticSvc = SERVICES.find((s) => s.slug === slug)
-  const name = detail?.name ?? staticSvc?.name ?? 'Service'
+  const featured = FEATURED_SERVICES.find((s) => s.slug === slug)
+  const name = detail?.name ?? featured?.name ?? 'Service'
   return getPageSeoMetadata({
     canonical: `/services/${slug}`,
     title: `${name} | Borda Event`,
-    description: detail?.description ?? staticSvc?.blurb ?? undefined,
+    description: detail?.description ?? featured?.blurb ?? undefined,
     ogImageUrl: detail?.coverImage?.url ?? RESOURCE_COVERS[slug] ?? undefined,
   })
 }
@@ -108,15 +107,14 @@ const buildSections = (
 const ServiceDetailPage = async ({ params }: Props) => {
   const { slug } = await params
   const detail = await getServiceBySlug(slug)
-  const staticSvc = SERVICES.find((s) => s.slug === slug)
   const featured = FEATURED_SERVICES.find((s) => s.slug === slug)
 
-  if (!detail && !staticSvc) notFound()
+  if (!detail) notFound()
 
-  const name = detail?.name ?? staticSvc?.name ?? slug
-  const category = staticSvc?.category
+  const name = detail.name
+  const category = featured?.category
   const description =
-    detail?.description ?? featured?.longDescription ?? staticSvc?.blurb ?? null
+    detail.description ?? featured?.longDescription ?? featured?.blurb ?? null
   const includes = featured?.includes ?? []
   const heroCover =
     detail?.coverImage?.url ??

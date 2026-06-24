@@ -8,7 +8,7 @@ import { getServiceCoverMap, getServices } from '@/lib/services-api'
 import { getPageSeoMetadata } from '@/utils/seo.helper'
 
 import { RESOURCE_COVERS, resolveCover } from '@/content/media'
-import { FEATURED_SERVICES, SERVICES } from '@/content/services'
+import { FEATURED_SERVICES } from '@/content/services'
 
 import { SectionHeading } from '../_components/section-heading'
 import { WhatsAppCta } from '../_components/whatsapp-cta'
@@ -22,31 +22,19 @@ export const metadata: Metadata = getPageSeoMetadata({
     'From intimate gatherings to grand weddings — explore every decoration & event-management service Borda Event offers in Surat, Gujarat.',
 })
 
-/**
- * Live, active services (admin sort order) with resolved covers. Falls back to
- * the static catalogue if the backend is unreachable so the page always fills.
- */
-const buildServices = async (
-  backendCovers: Map<string, string>
-): Promise<ServiceGridItem[]> => {
+/** Live, active services (admin sort order) with resolved covers. */
+const buildServices = async (): Promise<ServiceGridItem[]> => {
   const services = await getServices()
-  if (services.length) {
-    return services.map((s) => ({
-      slug: s.slug,
-      name: s.name,
-      coverUrl: s.coverImage?.url ?? RESOURCE_COVERS[s.slug] ?? null,
-    }))
-  }
-  return SERVICES.map((s) => ({
+  return services.map((s) => ({
     slug: s.slug,
     name: s.name,
-    coverUrl: resolveCover(s.slug, backendCovers),
+    coverUrl: s.coverImage?.url ?? RESOURCE_COVERS[s.slug] ?? null,
   }))
 }
 
 const ServicesPage = async () => {
   const backendCovers = await getServiceCoverMap()
-  const services = await buildServices(backendCovers)
+  const services = await buildServices()
 
   // Spotlight covers for the curated featured services.
   const covers: Record<string, string | null> = {}

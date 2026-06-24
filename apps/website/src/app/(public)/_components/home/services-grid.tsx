@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { getServices } from '@/lib/services-api'
 
 import { RESOURCE_COVERS } from '@/content/media'
-import { SERVICES } from '@/content/services'
 
 import { SectionHeading } from '../section-heading'
 import { type ServiceSlide, ServicesSlider } from './services-slider'
@@ -14,22 +13,13 @@ import { type ServiceSlide, ServicesSlider } from './services-slider'
 /**
  * Build the home slider from live, active backend services (admin sort order),
  * resolving each cover: backend image → local resource photo → logo fallback.
- * If the backend is unreachable, fall back to the static marketing catalogue
- * so the section always renders.
  */
 const buildSlides = async (): Promise<ServiceSlide[]> => {
   const services = await getServices()
-  if (services.length) {
-    return services.map((s) => ({
-      slug: s.slug,
-      name: s.name,
-      coverUrl: s.coverImage?.url ?? RESOURCE_COVERS[s.slug] ?? null,
-    }))
-  }
-  return SERVICES.map((s) => ({
+  return services.map((s) => ({
     slug: s.slug,
     name: s.name,
-    coverUrl: RESOURCE_COVERS[s.slug] ?? null,
+    coverUrl: s.coverImage?.url ?? RESOURCE_COVERS[s.slug] ?? null,
   }))
 }
 
