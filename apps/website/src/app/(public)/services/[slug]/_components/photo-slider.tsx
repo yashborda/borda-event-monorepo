@@ -1,7 +1,13 @@
 'use client'
 
 import { cn } from '@pkg/ui'
-import { IconChevronLeft, IconChevronRight, IconX } from '@tabler/icons-react'
+import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronUp,
+  IconX,
+} from '@tabler/icons-react'
 
 import Image from 'next/image'
 
@@ -23,6 +29,12 @@ const LG = 1024
 const lanesFor = (perView: PerView, width: number): number =>
   width >= LG ? perView.lg : width >= SM ? perView.sm : perView.base
 
+/** Which breakpoints render the slider vertically (stacked, Y-axis sliding). */
+export type Vertical = boolean | { base: boolean; sm: boolean; lg: boolean }
+
+const verticalFor = (v: Vertical, width: number): boolean =>
+  typeof v === 'boolean' ? v : width >= LG ? v.lg : width >= SM ? v.sm : v.base
+
 /**
  * Autoplaying slider with prev/next arrows, dot indicators, and a full-screen
  * lightbox on click. Autoplay pauses while the lightbox is open or the pointer
@@ -31,13 +43,27 @@ const lanesFor = (perView: PerView, width: number): number =>
  * `perView` controls how many photos are visible at once per breakpoint
  * (default 1 everywhere). A multi-up slider steps one photo at a time, so
  * consecutive windows overlap (1+2+3 → 2+3+4 …).
+ *
+ * `tileAspect` is each visible tile's width/height ratio in a multi-up slider
+ * (default 1 = square). Pass a portrait value (e.g. 3/4) when the slider sits
+ * in a narrow column beside a portrait video, so the tiles don't squish flat.
+ *
+ * `vertical` stacks the visible tiles top-to-bottom (instead of left-to-right)
+ * and sliding moves on the Y axis. The slider then fills its parent's height —
+ * use it beside a tall portrait video so the photo column matches its height
+ * instead of leaving an empty gap below a short horizontal strip. Accepts a
+ * per-breakpoint object (e.g. vertical only on mobile).
  */
 export const PhotoSlider = ({
   images,
   perView = { base: 1, sm: 1, lg: 1 },
+  tileAspect = 1,
+  vertical = false,
 }: {
   images: GalleryImage[]
   perView?: PerView
+  tileAspect?: number
+  vertical?: Vertical
 }) => {
   const [index, setIndex] = React.useState(0)
   // Lane count tracks the live viewport width so it can differ per breakpoint.
@@ -48,6 +74,8 @@ export const PhotoSlider = ({
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+  // Orientation resolved from the live width (vertical can be mobile-only).
+  const isVertical = verticalFor(vertical, vw)
   // Lightbox tracks an individual photo (-1 = closed) so it can step
   // per-photo independently of the slider's per-window stepping.
   const [lightboxIndex, setLightboxIndex] = React.useState(-1)
@@ -103,23 +131,41 @@ export const PhotoSlider = ({
   return (
     <>
       <div
-        className="group relative"
+        className={cn('group relative', isVertical && 'h-full')}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         {lanes >= 2 ? (
-          // Multi-up carousel: a sliding track of equal-width slides (100/lanes
+          // Multi-up carousel: a sliding track of equal-size slides (100/lanes
           // %), stepping one photo per click so consecutive windows overlap
           // (1+2+3 → 2+3+4 …). Each slide is its own rounded, bordered card with
-          // a gap between visible photos (via per-slide horizontal padding).
-          // Lane count is breakpoint-driven, so widths are computed in JS.
+          // a gap between visible photos (per-slide padding). Lane count is
+          // breakpoint-driven, so sizes are computed in JS.
+          //
+          // Horizontal: the container uses an aspect ratio (lanes × tileAspect).
+          // Vertical: it fills the parent's height (h-full) and stacks tiles
+          // top-to-bottom, so it matches a tall video column beside it.
           <div
-            className="relative w-full overflow-hidden"
-            style={{ aspectRatio: `${lanes} / 1` }}
+            className={cn(
+              'relative w-full overflow-hidden',
+              isVertical && 'h-full'
+            )}
+            style={
+              isVertical
+                ? undefined
+                : { aspectRatio: `${lanes * tileAspect} / 1` }
+            }
           >
             <div
-              className="flex h-full transition-transform duration-700 ease-out"
-              style={{ transform: `translateX(-${(index * 100) / lanes}%)` }}
+              className={cn(
+                'flex transition-transform duration-700 ease-out',
+                isVertical ? 'h-full flex-col' : 'h-full'
+              )}
+              style={{
+                transform: isVertical
+                  ? `translateY(-${(index * 100) / lanes}%)`
+                  : `translateX(-${(index * 100) / lanes}%)`,
+              }}
             >
               {images.map((img, i) => (
                 <button
@@ -127,8 +173,15 @@ export const PhotoSlider = ({
                   type="button"
                   onClick={() => setLightboxIndex(i)}
                   aria-label={`Enlarge photo ${i + 1} of ${count}`}
-                  className="h-full shrink-0 px-1.5"
-                  style={{ width: `${100 / lanes}%` }}
+                  className={cn(
+                    'shrink-0',
+                    isVertical ? 'w-full py-1.5' : 'h-full px-1.5'
+                  )}
+                  style={
+                    isVertical
+                      ? { height: `${100 / lanes}%` }
+                      : { width: `${100 / lanes}%` }
+                  }
                 >
                   <div className="border-border/60 bg-brand-ink/5 relative h-full w-full overflow-hidden rounded-lg border shadow-sm">
                     <Image
@@ -174,20 +227,45 @@ export const PhotoSlider = ({
               type="button"
               aria-label="Previous photo"
               onClick={() => go(-1)}
-              className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 left-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white"
+              className={cn(
+                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-9 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white',
+                isVertical
+                  ? 'top-2 left-1/2 -translate-x-1/2'
+                  : 'top-1/2 left-2 -translate-y-1/2'
+              )}
             >
-              <IconChevronLeft className="size-5" stroke={1.75} />
+              {isVertical ? (
+                <IconChevronUp className="size-5" stroke={1.75} />
+              ) : (
+                <IconChevronLeft className="size-5" stroke={1.75} />
+              )}
             </button>
             <button
               type="button"
               aria-label="Next photo"
               onClick={() => go(1)}
-              className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 right-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white"
+              className={cn(
+                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-9 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white',
+                isVertical
+                  ? 'bottom-2 left-1/2 -translate-x-1/2'
+                  : 'top-1/2 right-2 -translate-y-1/2'
+              )}
             >
-              <IconChevronRight className="size-5" stroke={1.75} />
+              {isVertical ? (
+                <IconChevronDown className="size-5" stroke={1.75} />
+              ) : (
+                <IconChevronRight className="size-5" stroke={1.75} />
+              )}
             </button>
 
-            <div className="mt-3 flex justify-center gap-1.5">
+            {/* Dots: hidden in vertical mode (the column is height-constrained;
+                top/bottom arrows are the affordance there). */}
+            <div
+              className={cn(
+                'mt-3 flex justify-center gap-1.5',
+                isVertical && 'hidden'
+              )}
+            >
               {Array.from({ length: steps }, (_, i) => (
                 <button
                   key={i}

@@ -235,43 +235,59 @@ const ServiceDetailPage = async ({ params }: Props) => {
       {/* Theme sections: cover + extra images + videos */}
       {sections.length > 0 && (
         <section className="bg-muted/30 px-6 py-14 md:py-20">
-          <div className="mx-auto max-w-6xl space-y-14">
-            {sections.map((section, i) => {
+          <div className="mx-auto max-w-6xl space-y-8 md:space-y-14">
+            {sections.map((section) => {
               const hasPhotos = section.images.length > 0
               const hasVideos = section.videos.length > 0
-              // Photos only → a 3-up slider at every breakpoint. With a video →
-              // a 2-up photo slider beside the video, stacked on mobile and
-              // side-by-side from `sm` up. Steps one photo at a time so windows
-              // overlap and the layout stays balanced.
+              // Photos only → a 3-up horizontal slider at every breakpoint.
+              // With a video → a photo slider on the LEFT, video on the RIGHT:
+              //   • mobile: VERTICAL 2-up, filling the video's portrait height
+              //     (no empty gap below a short horizontal strip);
+              //   • tablet: horizontal 3-up;  • desktop: horizontal 4-up.
               const split = hasPhotos && hasVideos
               const perView = split
-                ? { base: 2, sm: 2, lg: 2 }
+                ? { base: 2, sm: 3, lg: 4 }
                 : { base: 3, sm: 3, lg: 3 }
+              // Vertical only on mobile in the split case.
+              const vertical = split
+                ? { base: true, sm: false, lg: false }
+                : false
               return (
                 <div key={section.key}>
-                  <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
+                  {/* <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
                     {section.title ?? (i === 0 ? 'Gallery' : `Theme ${i + 1}`)}
                   </h2>
                   {section.description && (
                     <p className="text-muted-foreground text-body-md mt-2 max-w-2xl">
                       {section.description}
                     </p>
-                  )}
+                  )} */}
 
-                  {/* With a video: 2-up photo slider + video(s), stacked on
-                      mobile and side by side from `sm` up. Without a video: one
-                      3-up slider so the row stays balanced. */}
+                  {/* With a video: photo slider on the left, video on the
+                      right. Mobile is an even 2-col split (vertical photo slider
+                      matches the portrait video height); from `sm` up the photo
+                      slider gets more width so its 3 (tablet) / 4 (desktop)
+                      horizontal tiles stay a sensible size beside the video.
+                      Without a video: one 3-up slider so the row stays balanced. */}
                   <div
                     className={cn(
                       'mt-6 grid items-start gap-4 sm:gap-6',
-                      split && 'sm:grid-cols-2'
+                      split &&
+                        'grid-cols-2 sm:grid-cols-[3fr_1fr] lg:grid-cols-[4fr_1fr]'
                     )}
                   >
                     {hasPhotos && (
-                      <div>
+                      // Split case: on mobile the photo column takes the video's
+                      // portrait height (aspect-9/16) so the vertical slider's
+                      // h-full resolves and the columns line up. From `sm` up the
+                      // slider is horizontal and sizes itself, so drop the aspect.
+                      <div
+                        className={cn(split && 'aspect-9/16 sm:aspect-auto')}
+                      >
                         <PhotoSlider
                           images={section.images}
                           perView={perView}
+                          vertical={vertical}
                         />
                       </div>
                     )}

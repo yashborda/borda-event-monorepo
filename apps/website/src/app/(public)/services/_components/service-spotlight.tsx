@@ -12,7 +12,7 @@ type ServiceSpotlightProps = {
 
 /** Feature spotlight for the top services — image left, details right. */
 export const ServiceSpotlight = ({ covers }: ServiceSpotlightProps) => (
-  <div className="space-y-14 md:space-y-20">
+  <div className="space-y-8 md:space-y-20">
     {FEATURED_SERVICES.map((service, i) => (
       <div
         key={service.slug}
