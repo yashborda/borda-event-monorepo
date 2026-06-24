@@ -11,6 +11,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { tmpdir } from 'node:os';
 import { AuthGuard } from '@nestjs/passport';
 import type { IAdminJwtPayload } from '@pkg/types';
 import { CurrentUser } from '../auth/common/decorators/current-user.decorator.js';
@@ -27,8 +29,16 @@ export class ServiceVideosController {
   constructor(private readonly serviceVideosService: ServiceVideosService) {}
 
   // Multipart: `file` is required only for type='drive'; instagram sends fields only.
+  // Videos stream to a temp file on disk (NOT buffered in memory) so large
+  // uploads (250–350 MB) don't blow the instance's RAM limit. DriveService
+  // streams from file.path and removes the temp file afterwards.
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({ destination: tmpdir() }),
+      limits: { fileSize: 500 * 1024 * 1024 },
+    }),
+  )
   @RequirePermissions('service-videos:create')
   createVideo(
     @Param('serviceId') serviceId: string,

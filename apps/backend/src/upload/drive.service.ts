@@ -6,6 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { google, type drive_v3 } from 'googleapis';
 import { Readable } from 'node:stream';
+import { createReadStream } from 'node:fs';
+import { unlink } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { DrizzleService } from '../database/drizzle.service.js';
 import { mediaFiles } from '../database/schema/media-files.table.js';
@@ -15,7 +17,10 @@ export interface UploadedFile {
   originalname: string;
   mimetype: string;
   size: number;
-  buffer: Buffer;
+  /** Present with Multer memory storage (images). */
+  buffer?: Buffer;
+  /** Present with Multer disk storage (videos) — stream from here instead. */
+  path?: string;
 }
 
 const ALLOWED_MIME_TYPES = [
@@ -141,6 +146,8 @@ export class DriveService {
       );
     if (file.size > MAX_FILE_SIZE)
       throw new BadRequestException('File size must not exceed 150 MB.');
+    if (!file.buffer)
+      throw new BadRequestException('File contents are missing.');
 
     const folderName = subfolder.trim() || 'general';
     const drive = this.drive();
@@ -236,28 +243,46 @@ export class DriveService {
     if (file.size > MAX_VIDEO_SIZE)
       throw new BadRequestException('Video size must not exceed 500 MB.');
 
+    // Videos arrive via Multer disk storage (see ServiceVideosController) and
+    // are streamed straight to Drive from the temp file, so a 250–350 MB upload
+    // never sits fully in memory. Fall back to an in-memory buffer if present.
+    const body = file.path
+      ? createReadStream(file.path)
+      : file.buffer
+        ? Readable.from(file.buffer)
+        : null;
+    if (!body) throw new BadRequestException('Video contents are missing.');
+
     const folderName = subfolder.trim() || 'general';
     const drive = this.drive();
-    const folderId = await this.findOrCreateSubfolder(folderName);
 
-    const uploaded = await drive.files.create({
-      requestBody: { name: file.originalname, parents: [folderId] },
-      media: { mimeType: file.mimetype, body: Readable.from(file.buffer) },
-      fields: 'id',
-      supportsAllDrives: true,
-    });
-    const driveFileId = uploaded.data.id;
-    if (!driveFileId)
-      throw new InternalServerErrorException('Drive upload failed');
+    try {
+      const folderId = await this.findOrCreateSubfolder(folderName);
 
-    await drive.permissions.create({
-      fileId: driveFileId,
-      requestBody: { type: 'anyone', role: 'reader' },
-      supportsAllDrives: true,
-    });
+      const uploaded = await drive.files.create({
+        requestBody: { name: file.originalname, parents: [folderId] },
+        media: { mimeType: file.mimetype, body },
+        fields: 'id',
+        supportsAllDrives: true,
+        // Resumable upload — googleapis chunks the stream so memory stays flat.
+        uploadType: 'resumable',
+      });
+      const driveFileId = uploaded.data.id;
+      if (!driveFileId)
+        throw new InternalServerErrorException('Drive upload failed');
 
-    const driveUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
-    return { driveFileId, driveUrl };
+      await drive.permissions.create({
+        fileId: driveFileId,
+        requestBody: { type: 'anyone', role: 'reader' },
+        supportsAllDrives: true,
+      });
+
+      const driveUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+      return { driveFileId, driveUrl };
+    } finally {
+      // Remove the temp file Multer wrote, regardless of success/failure.
+      if (file.path) await unlink(file.path).catch(() => undefined);
+    }
   }
 
   /**
@@ -268,8 +293,7 @@ export class DriveService {
    */
   async renameFile(driveFileId: string, newName: string): Promise<void> {
     const trimmed = newName.trim();
-    if (!trimmed)
-      throw new BadRequestException('Name cannot be empty');
+    if (!trimmed) throw new BadRequestException('Name cannot be empty');
     await this.drive().files.update({
       fileId: driveFileId,
       requestBody: { name: trimmed },
