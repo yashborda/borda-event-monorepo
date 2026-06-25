@@ -27,9 +27,8 @@ export class CreateServiceDto {
   coverImageId?: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  basePrice?: number;
+  @IsUUID()
+  bannerImageId?: string;
 
   @IsOptional()
   @IsBoolean()

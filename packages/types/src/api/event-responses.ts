@@ -28,7 +28,6 @@ export type IService = {
   name: string;
   slug: string;
   coverImage: IMediaFile | null;
-  basePrice: number | null;
   isActive: boolean;
   sortOrder: number;
   mediaCount: number;
@@ -79,6 +78,7 @@ export type IServiceThemeWithMedia = IServiceTheme & {
 
 export type IServiceDetail = IService & {
   description: string | null;
+  bannerImage: IMediaFile | null;
   media: IServiceMediaItem[];
   themes: IServiceThemeWithMedia[];
 };
@@ -107,7 +107,6 @@ export type ICatalogueServiceItem = {
   name: string;
   slug: string;
   isActive: boolean;
-  basePrice: number | null;
   coverImage: IMediaFile | null;
   sortOrder: number;
 };

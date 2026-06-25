@@ -537,7 +537,6 @@ export class CataloguesService {
         name: services.name,
         slug: services.slug,
         isActive: services.isActive,
-        basePrice: services.basePrice,
         coverImageId: coverImg.id,
         coverImageUrl: coverImg.url,
         coverImageFolder: coverImg.folder,
@@ -557,7 +556,6 @@ export class CataloguesService {
       name: s.name,
       slug: s.slug,
       isActive: s.isActive,
-      basePrice: s.basePrice,
       coverImage: mediaObject({
         id: s.coverImageId,
         url: s.coverImageUrl,

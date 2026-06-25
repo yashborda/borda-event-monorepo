@@ -1,8 +1,7 @@
 'use client'
 
-import type { IService } from '@pkg/types'
+import type { IApiError, IService } from '@pkg/types'
 import {
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +14,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  toast,
 } from '@pkg/ui'
 import {
   IconDots,
@@ -25,10 +25,14 @@ import {
 } from '@tabler/icons-react'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 import { useMemo, useState } from 'react'
 
 import { appDate } from '@/utils/date.helper'
+
+import { apiFetch } from '@/lib/api-client'
+import { handleException } from '@/lib/api-helper'
 
 import { usePermissions } from '@/hooks/use-permissions'
 import { useTable } from '@/hooks/use-table'
@@ -48,6 +52,7 @@ type IActiveFilter = 'all' | 'active' | 'inactive'
 
 const ServicesPage = () => {
   const { can } = usePermissions()
+  const router = useRouter()
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     name: string
@@ -58,6 +63,7 @@ const ServicesPage = () => {
   } | null>(null)
   const [includeDeleted, setIncludeDeleted] = useState(false)
   const [activeFilter, setActiveFilter] = useState<IActiveFilter>('all')
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
   const extraParams = useMemo(() => {
     const p: Record<string, string> = {
@@ -80,6 +86,31 @@ const ServicesPage = () => {
   const canUpdate = can('services:update')
   const canDelete = can('services:delete')
 
+  const serviceHref = (s: IService) =>
+    s.deletedAt ? `/services/${s.id}?deleted=true` : `/services/${s.id}`
+
+  const toggleStatus = async (s: IService) => {
+    setTogglingIds((prev) => new Set(prev).add(s.id))
+    try {
+      await apiFetch(`/api/admin/services/${s.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: !s.isActive }),
+      })
+      toast.success(
+        `${s.name} ${!s.isActive ? 'activated' : 'deactivated'} successfully`
+      )
+      reload()
+    } catch (e) {
+      handleException(e as IApiError)
+    } finally {
+      setTogglingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(s.id)
+        return next
+      })
+    }
+  }
+
   const activeColumns: IColumn<IService>[] = [
     {
       key: 'name',
@@ -89,12 +120,9 @@ const ServicesPage = () => {
       cell: (s) => (
         <div>
           <Link
-            href={
-              s.deletedAt
-                ? `/services/${s.id}?deleted=true`
-                : `/services/${s.id}`
-            }
+            href={serviceHref(s)}
             className="text-body-md text-foreground font-medium hover:underline"
+            onClick={(e) => e.stopPropagation()}
           >
             {s.name}
           </Link>
@@ -105,21 +133,26 @@ const ServicesPage = () => {
     {
       key: 'isActive',
       header: 'Status',
-      minWidth: 110,
-      cell: (s) => (
-        <Badge variant={s.isActive ? 'success' : 'muted'}>
-          {s.isActive ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'basePrice',
-      header: 'Base Price',
-      sorting: true,
-      minWidth: 110,
-      cell: (s) => (
-        <span className="text-muted-foreground">{s.basePrice ?? '—'}</span>
-      ),
+      minWidth: 130,
+      cell: (s) => {
+        const isDeleted = !!s.deletedAt
+        return (
+          <div
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Switch
+              checked={s.isActive}
+              onCheckedChange={() => toggleStatus(s)}
+              color={s.isActive ? 'success' : 'destructive'}
+              disabled={!canUpdate || isDeleted || togglingIds.has(s.id)}
+            />
+            <span className="text-muted-foreground text-xs">
+              {s.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        )
+      },
     },
     {
       key: 'mediaCount',
@@ -178,20 +211,17 @@ const ServicesPage = () => {
     cell: (s) => {
       const isDeleted = !!s.deletedAt
       return (
-        <div className="flex items-center justify-end gap-1">
+        <div
+          className="flex items-center justify-end gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Button
             variant="ghost-muted"
             size="sm"
             className="size-8 p-0"
             asChild
           >
-            <Link
-              href={
-                isDeleted
-                  ? `/services/${s.id}?deleted=true`
-                  : `/services/${s.id}`
-              }
-            >
+            <Link href={serviceHref(s)}>
               {canUpdate && !isDeleted ? (
                 <IconPencil className="size-4" />
               ) : (
@@ -302,6 +332,7 @@ const ServicesPage = () => {
             data={data}
             rowKey={(s) => s.id}
             loading={loading}
+            onRowClick={(s) => router.push(serviceHref(s))}
             emptyMessage={
               includeDeleted
                 ? 'No deleted services found.'

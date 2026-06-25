@@ -30,7 +30,7 @@ export class ServiceVideosController {
 
   // Multipart: `file` is required only for type='drive'; instagram sends fields only.
   // Videos stream to a temp file on disk (NOT buffered in memory) so large
-  // uploads (250–350 MB) don't blow the instance's RAM limit. DriveService
+  // uploads (250–350 MB) don't blow the instance's RAM limit. R2Service
   // streams from file.path and removes the temp file afterwards.
   @Post()
   @UseInterceptors(

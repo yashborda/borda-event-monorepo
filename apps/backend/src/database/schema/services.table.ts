@@ -19,7 +19,9 @@ export const services = pgTable('services', {
   coverImageId: uuid('cover_image_id').references(() => mediaFiles.id, {
     onDelete: 'set null',
   }),
-  basePrice: integer('base_price'),
+  bannerImageId: uuid('banner_image_id').references(() => mediaFiles.id, {
+    onDelete: 'set null',
+  }),
   isActive: boolean('is_active').default(true).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
   // Audit

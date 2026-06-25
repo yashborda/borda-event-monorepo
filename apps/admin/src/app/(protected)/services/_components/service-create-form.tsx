@@ -34,10 +34,10 @@ const schema = z.object({
     .max(255)
     .regex(slugRegex, 'Lowercase letters, numbers, hyphens only'),
   description: z.string().optional(),
-  basePrice: z.number().int().min(0).optional(),
   isActive: z.enum(['active', 'inactive']),
   sortOrder: z.number(),
   coverImage: mediaFileSchema.nullable().optional(),
+  bannerImage: mediaFileSchema.nullable().optional(),
 })
 
 type IFormData = z.infer<typeof schema>
@@ -56,6 +56,7 @@ export const ServiceCreateForm = forwardRef<
 >(({ onSaveSuccess, onSubmittingChange, footer }, ref) => {
   const { slug, setSlug, onSourceChange } = useSlug()
   const coverRef = useRef<ImageUploadHandle>(null)
+  const bannerRef = useRef<ImageUploadHandle>(null)
 
   const {
     register,
@@ -70,6 +71,7 @@ export const ServiceCreateForm = forwardRef<
   })
 
   const watchedCover = useWatch({ control, name: 'coverImage' })
+  const watchedBanner = useWatch({ control, name: 'bannerImage' })
   const watchedActive = useWatch({ control, name: 'isActive' })
 
   useEffect(() => {
@@ -82,6 +84,8 @@ export const ServiceCreateForm = forwardRef<
     try {
       const cover = await coverRef.current!.upload()
       if (cover === undefined) return
+      const banner = await bannerRef.current!.upload()
+      if (banner === undefined) return
       await handleSubmit(async (data) => {
         try {
           await apiFetch('/api/admin/services', {
@@ -91,7 +95,7 @@ export const ServiceCreateForm = forwardRef<
               slug: data.slug,
               description: data.description || undefined,
               coverImageId: cover?.id ?? null,
-              basePrice: data.basePrice ?? null,
+              bannerImageId: banner?.id ?? null,
               isActive: data.isActive === 'active',
               sortOrder: data.sortOrder,
             }),
@@ -141,18 +145,6 @@ export const ServiceCreateForm = forwardRef<
           onChange={(e) => setSlug(e.target.value)}
         />
         <Input
-          id="basePrice"
-          label="Base Price"
-          type="number"
-          placeholder="0"
-          disabled={isSubmitting}
-          errorMessage={errors.basePrice?.message}
-          {...register('basePrice', {
-            setValueAs: (v) =>
-              v === '' || v === null || v === undefined ? undefined : Number(v),
-          })}
-        />
-        <Input
           id="sortOrder"
           label="Sort Order"
           type="number"
@@ -199,6 +191,20 @@ export const ServiceCreateForm = forwardRef<
         }
         disabled={isSubmitting}
         errorMessage={errors.coverImage?.message}
+      />
+
+      <ImageUpload
+        ref={bannerRef}
+        deferred
+        folder="general"
+        id="bannerImage"
+        label="Banner Image"
+        value={watchedBanner ?? null}
+        onChange={(media) =>
+          setValue('bannerImage', media, { shouldValidate: true })
+        }
+        disabled={isSubmitting}
+        errorMessage={errors.bannerImage?.message}
       />
 
       {footer}

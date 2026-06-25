@@ -13,14 +13,14 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { UploadService } from './upload.service.js';
-import { DriveService } from './drive.service.js';
+import { R2Service } from './r2.service.js';
 
 @Controller('admin/upload')
 @UseGuards(AuthGuard('admin-jwt'))
 export class UploadController {
   constructor(
     private readonly uploadService: UploadService,
-    private readonly driveService: DriveService,
+    private readonly r2Service: R2Service,
   ) {}
 
   @Post('image')
@@ -39,8 +39,10 @@ export class UploadController {
     await this.uploadService.deleteFileByUrl(url);
   }
 
-  // ── Google Drive ───────────────────────────────────────────
-  // Upload an image to Drive under a subfolder (defaults to "general").
+  // ── Cloudflare R2 ──────────────────────────────────────────
+  // Route paths keep the legacy "drive-image" name so the admin frontend keeps
+  // working; storage is now Cloudflare R2.
+  // Upload an image to R2 under a subfolder (defaults to "general").
   @Post('drive-image')
   @UseInterceptors(FileInterceptor('file'))
   async uploadDriveImage(
@@ -48,14 +50,14 @@ export class UploadController {
     @Query('folder') folder = 'general',
   ) {
     if (!file) throw new BadRequestException('file is required');
-    return this.driveService.uploadImage(file, folder);
+    return this.r2Service.uploadImage(file, folder);
   }
 
-  // Delete a Drive-backed media file (and its media_files row) by media id.
+  // Delete an R2-backed media file (and its media_files row) by media id.
   @Delete('drive-image')
   @HttpCode(204)
   async deleteDriveImage(@Query('id') id: string) {
     if (!id) throw new BadRequestException('id (media file id) is required');
-    await this.driveService.deleteFile(id);
+    await this.r2Service.deleteFile(id);
   }
 }

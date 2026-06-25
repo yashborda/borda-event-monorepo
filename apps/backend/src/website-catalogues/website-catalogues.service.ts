@@ -147,7 +147,6 @@ export class WebsiteCataloguesService {
         name: services.name,
         slug: services.slug,
         description: services.description,
-        basePrice: services.basePrice,
         coverImageId: coverImg.id,
         coverImageUrl: coverImg.url,
         coverImageFolder: coverImg.folder,
@@ -173,7 +172,6 @@ export class WebsiteCataloguesService {
       name: s.name,
       slug: s.slug,
       description: s.description,
-      basePrice: s.basePrice,
       coverImage: mediaObject({
         id: s.coverImageId,
         url: s.coverImageUrl,

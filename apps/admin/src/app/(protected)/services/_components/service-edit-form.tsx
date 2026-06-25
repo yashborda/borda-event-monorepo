@@ -41,10 +41,10 @@ const schema = z.object({
     .max(255)
     .regex(slugRegex, 'Lowercase letters, numbers, hyphens only'),
   description: z.string().optional(),
-  basePrice: z.number().int().min(0).optional(),
   isActive: z.enum(['active', 'inactive']),
   sortOrder: z.number(),
   coverImage: mediaFileSchema.nullable().optional(),
+  bannerImage: mediaFileSchema.nullable().optional(),
 })
 
 type IFormData = z.infer<typeof schema>
@@ -79,6 +79,7 @@ export const ServiceEditForm = forwardRef<
     const canUpdate = can('services:update')
     const { slug, setSlug } = useSlug()
     const coverRef = useRef<ImageUploadHandle>(null)
+    const bannerRef = useRef<ImageUploadHandle>(null)
 
     const [isLoading, setIsLoading] = useState(true)
     const [isDeleted, setIsDeleted] = useState(false)
@@ -97,6 +98,7 @@ export const ServiceEditForm = forwardRef<
     })
 
     const watchedCover = useWatch({ control, name: 'coverImage' })
+    const watchedBanner = useWatch({ control, name: 'bannerImage' })
     const watchedActive = useWatch({ control, name: 'isActive' })
 
     useEffect(() => {
@@ -113,10 +115,10 @@ export const ServiceEditForm = forwardRef<
             name: data.name,
             slug: data.slug,
             description: data.description ?? '',
-            basePrice: data.basePrice ?? undefined,
             isActive: data.isActive ? 'active' : 'inactive',
             sortOrder: data.sortOrder,
             coverImage: data.coverImage ?? null,
+            bannerImage: data.bannerImage ?? null,
           })
           setIsDeleted(!!data.deletedAt)
           onLoad?.(data)
@@ -135,6 +137,8 @@ export const ServiceEditForm = forwardRef<
       try {
         const cover = await coverRef.current!.upload()
         if (cover === undefined) return
+        const banner = await bannerRef.current!.upload()
+        if (banner === undefined) return
         await handleSubmit(async (data) => {
           try {
             await apiFetch(`/api/admin/services/${serviceId}`, {
@@ -144,7 +148,7 @@ export const ServiceEditForm = forwardRef<
                 slug: data.slug,
                 description: data.description || null,
                 coverImageId: cover?.id ?? null,
-                basePrice: data.basePrice ?? null,
+                bannerImageId: banner?.id ?? null,
                 isActive: data.isActive === 'active',
                 sortOrder: data.sortOrder,
               }),
@@ -207,19 +211,6 @@ export const ServiceEditForm = forwardRef<
             onChange={(e) => setSlug(e.target.value)}
           />
           <Input
-            id="basePrice"
-            label="Base Price"
-            type="number"
-            disabled={disabled}
-            errorMessage={errors.basePrice?.message}
-            {...register('basePrice', {
-              setValueAs: (v) =>
-                v === '' || v === null || v === undefined
-                  ? undefined
-                  : Number(v),
-            })}
-          />
-          <Input
             id="sortOrder"
             label="Sort Order"
             type="number"
@@ -264,6 +255,20 @@ export const ServiceEditForm = forwardRef<
           }
           disabled={disabled}
           errorMessage={errors.coverImage?.message}
+        />
+
+        <ImageUpload
+          ref={bannerRef}
+          deferred
+          folder="general"
+          id="bannerImage"
+          label="Banner Image"
+          value={watchedBanner ?? null}
+          onChange={(media) =>
+            setValue('bannerImage', media, { shouldValidate: true })
+          }
+          disabled={disabled}
+          errorMessage={errors.bannerImage?.message}
         />
 
         {footer}

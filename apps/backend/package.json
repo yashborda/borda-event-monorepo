@@ -27,9 +27,11 @@
     "seed": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/seed.ts",
     "seed:blogs": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/blog-seed.ts",
     "seed:services": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/services-seed.ts",
+    "seed:themes": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/themes-seed.ts",
     "db:reset": "ts-node -r dotenv/config -r tsconfig-paths/register src/database/seeds/reset.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.17",
@@ -45,7 +47,6 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
-    "googleapis": "^173.0.0",
     "multer": "2.1.1",
     "nodemailer": "^8.0.4",
     "passport": "^0.7.0",

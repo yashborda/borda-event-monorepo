@@ -48,7 +48,6 @@ export class WebsiteServicesService {
         coverImageOriginalName: coverImg.originalName,
         coverImageMimeType: coverImg.mimeType,
         coverImageSize: coverImg.size,
-        basePrice: services.basePrice,
         sortOrder: services.sortOrder,
       })
       .from(services)
@@ -69,7 +68,6 @@ export class WebsiteServicesService {
         mimeType: s.coverImageMimeType,
         size: s.coverImageSize,
       }),
-      basePrice: s.basePrice,
       sortOrder: s.sortOrder,
     }));
   }
@@ -98,7 +96,6 @@ export class WebsiteServicesService {
         coverImageOriginalName: coverImg.originalName,
         coverImageMimeType: coverImg.mimeType,
         coverImageSize: coverImg.size,
-        basePrice: services.basePrice,
         sortOrder: services.sortOrder,
         createdAt: services.createdAt,
         updatedAt: services.updatedAt,
@@ -148,7 +145,6 @@ export class WebsiteServicesService {
         mimeType: s.coverImageMimeType,
         size: s.coverImageSize,
       }),
-      basePrice: s.basePrice,
       sortOrder: s.sortOrder,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
