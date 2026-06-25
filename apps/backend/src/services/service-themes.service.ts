@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DrizzleService } from '../database/drizzle.service.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { services } from '../database/schema/services.table.js';
@@ -98,6 +98,43 @@ export class ServiceThemesService {
 
     this.revalidationService.revalidate(['services', `service-${service.slug}`]);
     return { message: 'Theme deleted' };
+  }
+
+  /**
+   * Delete multiple themes at once. Every id must belong to this service or the
+   * whole call is rejected (no partial deletes). Attached media/videos unlink
+   * via ON DELETE cascade, same as single remove. Returns the deleted count.
+   */
+  async bulkRemove(serviceId: string, themeIds: string[]) {
+    const service = await this.getServiceOrThrow(serviceId);
+
+    const ids = Array.from(new Set(themeIds));
+    const owned = await this.drizzle.db
+      .select({ id: serviceThemes.id })
+      .from(serviceThemes)
+      .where(
+        and(
+          eq(serviceThemes.serviceId, serviceId),
+          inArray(serviceThemes.id, ids),
+        ),
+      );
+
+    if (owned.length !== ids.length)
+      throw new BadRequestException(
+        'One or more themes do not belong to this service',
+      );
+
+    await this.drizzle.db
+      .delete(serviceThemes)
+      .where(
+        and(
+          eq(serviceThemes.serviceId, serviceId),
+          inArray(serviceThemes.id, ids),
+        ),
+      );
+
+    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    return { message: `${ids.length} theme(s) deleted`, count: ids.length };
   }
 
   async reorder(serviceId: string, themeIds: string[]) {
