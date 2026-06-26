@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -130,6 +131,46 @@ export class R2Service {
     return `${this.folderPrefix(subfolder)}/${randomUUID()}.${ext}`;
   }
 
+  /** True if an object already exists at this key. */
+  private async objectExists(key: string): Promise<boolean> {
+    try {
+      await this.s3().send(
+        new HeadObjectCommand({ Bucket: this.bucket(), Key: key }),
+      );
+      return true;
+    } catch (err: unknown) {
+      // 404 / NotFound → free. Anything else is a real error worth surfacing.
+      const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (e?.name === 'NotFound' || e?.$metadata?.httpStatusCode === 404)
+        return false;
+      throw err;
+    }
+  }
+
+  /**
+   * Allocate a readable, collision-free key of the form
+   * `<folder>/<prefix>-NN.<ext>` where NN starts at `startSeq` (zero-padded to
+   * 2) and increments past any already-taken keys. Used for theme media so the
+   * R2 browser shows names like `baby-shower/th-01-03.jpg` instead of UUIDs.
+   */
+  private async allocateSequencedKey(
+    folder: string,
+    prefix: string,
+    startSeq: number,
+    ext: string,
+  ): Promise<string> {
+    let seq = Math.max(1, startSeq);
+    // Bounded loop — a theme realistically holds far fewer than 1000 files.
+    for (let i = 0; i < 1000; i++) {
+      const pad = seq < 100 ? String(seq).padStart(2, '0') : String(seq);
+      const key = `${folder}/${prefix}-${pad}.${ext}`;
+      if (!(await this.objectExists(key))) return key;
+      seq++;
+    }
+    // Fallback: extremely unlikely, keep upload working with a unique suffix.
+    return `${folder}/${prefix}-${randomUUID().slice(0, 8)}.${ext}`;
+  }
+
   /**
    * Kept for interface compatibility with the old DriveService — R2 creates no
    * folders, so the "subfolder" is resolved lazily as a key prefix at upload
@@ -142,8 +183,17 @@ export class R2Service {
   /**
    * Upload an image to R2 under the named subfolder and persist a media_files
    * row. Returns the record.
+   *
+   * When `opts.namePrefix` is given the object key becomes a readable,
+   * collision-free `<folder>/<namePrefix>-NN.<ext>` (NN starting at
+   * `opts.startSeq`) instead of a UUID — used for theme media so files read as
+   * e.g. `baby-shower/th-01-03.jpg`.
    */
-  async uploadImage(file: UploadedFile, subfolder: string) {
+  async uploadImage(
+    file: UploadedFile,
+    subfolder: string,
+    opts?: { namePrefix?: string; startSeq?: number },
+  ) {
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype))
       throw new BadRequestException(
         'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.',
@@ -154,7 +204,15 @@ export class R2Service {
       throw new BadRequestException('File contents are missing.');
 
     const folderName = this.folderPrefix(subfolder);
-    const key = this.objectKey(subfolder, file.mimetype);
+    const ext = EXT_BY_MIME[file.mimetype] ?? 'bin';
+    const key = opts?.namePrefix
+      ? await this.allocateSequencedKey(
+          folderName,
+          opts.namePrefix,
+          opts.startSeq ?? 1,
+          ext,
+        )
+      : this.objectKey(subfolder, file.mimetype);
 
     await this.s3().send(
       new PutObjectCommand({
@@ -225,6 +283,7 @@ export class R2Service {
   async uploadVideo(
     file: UploadedFile,
     subfolder: string,
+    opts?: { namePrefix?: string; startSeq?: number },
   ): Promise<{ driveFileId: string; driveUrl: string }> {
     if (!ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype))
       throw new BadRequestException(
@@ -233,7 +292,15 @@ export class R2Service {
     if (file.size > MAX_VIDEO_SIZE)
       throw new BadRequestException('Video size must not exceed 500 MB.');
 
-    const key = this.objectKey(subfolder, file.mimetype);
+    const ext = EXT_BY_MIME[file.mimetype] ?? 'bin';
+    const key = opts?.namePrefix
+      ? await this.allocateSequencedKey(
+          this.folderPrefix(subfolder),
+          opts.namePrefix,
+          opts.startSeq ?? 1,
+          ext,
+        )
+      : this.objectKey(subfolder, file.mimetype);
 
     try {
       // Stream from the temp file when present (videos use Multer disk storage),

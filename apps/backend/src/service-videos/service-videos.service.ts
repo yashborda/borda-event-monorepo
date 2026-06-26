@@ -51,6 +51,27 @@ export class ServiceVideosService {
     let driveFileId: string | null = null;
     let driveUrl: string | null = null;
 
+    // If a themeId is provided, confirm it belongs to this service (do this
+    // before the upload so we can name the R2 object th-<themeNum>-NN).
+    let theme: { id: string; name: string } | null = null;
+    if (dto.themeId) {
+      const [row] = await this.drizzle.db
+        .select({ id: serviceThemes.id, name: serviceThemes.name })
+        .from(serviceThemes)
+        .where(
+          and(
+            eq(serviceThemes.id, dto.themeId),
+            eq(serviceThemes.serviceId, serviceId),
+          ),
+        )
+        .limit(1);
+      if (!row)
+        throw new BadRequestException(
+          'Theme does not belong to this service',
+        );
+      theme = row;
+    }
+
     if (dto.type === 'instagram') {
       if (!dto.instagramUrl)
         throw new BadRequestException(
@@ -62,27 +83,33 @@ export class ServiceVideosService {
         throw new BadRequestException(
           'A video file is required for a drive video',
         );
-      const uploaded = await this.r2Service.uploadVideo(file, service.name);
+
+      // Readable R2 key for theme videos: th-<themeNum>-NN. Sequence continues
+      // past existing videos already in this theme.
+      let nameOpts: { namePrefix: string; startSeq: number } | undefined;
+      if (theme) {
+        const [{ count: videoCount }] = await this.drizzle.db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(serviceVideos)
+          .where(
+            and(
+              eq(serviceVideos.serviceId, serviceId),
+              eq(serviceVideos.themeId, theme.id),
+            ),
+          );
+        nameOpts = {
+          namePrefix: `th-${this.themeNumber(theme.name)}`,
+          startSeq: videoCount + 1,
+        };
+      }
+
+      const uploaded = await this.r2Service.uploadVideo(
+        file,
+        service.name,
+        nameOpts,
+      );
       driveFileId = uploaded.driveFileId;
       driveUrl = uploaded.driveUrl;
-    }
-
-    // If a themeId is provided, confirm it belongs to this service before insert.
-    if (dto.themeId) {
-      const [theme] = await this.drizzle.db
-        .select({ id: serviceThemes.id })
-        .from(serviceThemes)
-        .where(
-          and(
-            eq(serviceThemes.id, dto.themeId),
-            eq(serviceThemes.serviceId, serviceId),
-          ),
-        )
-        .limit(1);
-      if (!theme)
-        throw new BadRequestException(
-          'Theme does not belong to this service',
-        );
     }
 
     // sort_order = max(existing) + 1
@@ -426,5 +453,12 @@ export class ServiceVideosService {
         'Cannot modify videos of a deleted service',
       );
     return service;
+  }
+
+  /** `baby-theme-07` → `07`; falls back to `01`. Zero-padded to 2+ digits. */
+  private themeNumber(themeName: string): string {
+    const m = themeName.match(/(\d+)\s*$/);
+    const n = m ? parseInt(m[1], 10) : 1;
+    return n < 100 ? String(n).padStart(2, '0') : String(n);
   }
 }

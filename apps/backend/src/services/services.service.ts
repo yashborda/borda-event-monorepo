@@ -458,11 +458,31 @@ export class ServicesService {
   ) {
     const service = await this.getServiceOrThrow(id);
 
-    if (themeId) await this.assertThemeBelongsToService(id, themeId);
+    // For theme media, derive a readable R2 key prefix `th-<themeNum>` and the
+    // next sequence number so files land as e.g. baby-shower/th-01-03.jpg.
+    let nameOpts: { namePrefix: string; startSeq: number } | undefined;
+    if (themeId) {
+      const theme = await this.assertThemeBelongsToService(id, themeId);
+      const themeNum = this.themeNumber(theme.name);
+      const [{ count: mediaCount }] = await this.drizzle.db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(serviceMedia)
+        .where(
+          and(
+            eq(serviceMedia.serviceId, id),
+            eq(serviceMedia.themeId, themeId),
+          ),
+        );
+      nameOpts = { namePrefix: `th-${themeNum}`, startSeq: mediaCount + 1 };
+    }
 
     // Upload to R2 (subfolder = service name); this inserts the media_files
     // row (with the R2 object key in drive_file_id + url) and returns it.
-    const media = await this.r2Service.uploadImage(file, service.name);
+    const media = await this.r2Service.uploadImage(
+      file,
+      service.name,
+      nameOpts,
+    );
 
     const [{ maxOrder }] = await this.drizzle.db
       .select({
@@ -562,7 +582,7 @@ export class ServicesService {
     themeId: string,
   ) {
     const [t] = await this.drizzle.db
-      .select({ id: serviceThemes.id })
+      .select({ id: serviceThemes.id, name: serviceThemes.name })
       .from(serviceThemes)
       .where(
         and(
@@ -572,6 +592,18 @@ export class ServicesService {
       )
       .limit(1);
     if (!t) throw new BadRequestException('Theme does not belong to this service');
+    return t;
+  }
+
+  /**
+   * Pull the numeric suffix out of a theme name like `baby-theme-07` → `07`.
+   * Falls back to `01` if the name has no trailing number. Always 2+ digits,
+   * zero-padded, so R2 keys sort/group naturally (th-01, th-02 … th-100).
+   */
+  private themeNumber(themeName: string): string {
+    const m = themeName.match(/(\d+)\s*$/);
+    const n = m ? parseInt(m[1], 10) : 1;
+    return n < 100 ? String(n).padStart(2, '0') : String(n);
   }
 
   /**
