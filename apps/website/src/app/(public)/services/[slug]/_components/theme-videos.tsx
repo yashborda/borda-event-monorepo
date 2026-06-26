@@ -2,14 +2,8 @@
 
 import type { IServiceThemeVideo } from '@pkg/types'
 import { cn } from '@pkg/ui'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconPlayerPlayFilled,
-  IconX,
-} from '@tabler/icons-react'
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 
-import Image from 'next/image'
 import Script from 'next/script'
 
 import * as React from 'react'
@@ -33,45 +27,42 @@ const toPermalink = (url: string): string => {
   }
 }
 
-const drivePoster = (fileId: string) =>
-  `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`
-
 /**
- * Drive video tile: a clean poster + single play button. Tapping opens the full
- * player in a modal — so the cramped inline Drive control bar never shows in the
- * narrow column (the cause of the overflowing controls on mobile).
+ * Uploaded (R2-hosted) video: plays directly inline, muted + autoplay + loop so
+ * it behaves like an ambient reel. `driveUrl` is the direct public file URL.
+ * Native controls stay available for sound/scrubbing.
  */
-const DrivePoster = ({
-  video,
-  onPlay,
-}: {
-  video: IServiceThemeVideo
-  onPlay: () => void
-}) => (
-  <button
-    type="button"
-    onClick={onPlay}
-    aria-label={video.title ?? 'Play video'}
-    className="group border-border/60 bg-brand-ink/5 relative block aspect-9/16 w-full overflow-hidden rounded-lg border shadow-sm"
-  >
-    {video.driveFileId && (
-      <Image
-        src={drivePoster(video.driveFileId)}
-        alt={video.title ?? 'Video'}
-        fill
-        sizes="(max-width: 1024px) 50vw, 33vw"
-        className="object-cover transition-transform duration-500 group-hover:scale-105"
+const InlineVideo = ({ video }: { video: IServiceThemeVideo }) => {
+  if (!video.driveUrl) return null
+  // The #t=0.1 media fragment makes the browser seek to ~0.1s and paint that
+  // frame as a poster, so the tile shows a still instead of a black box before
+  // autoplay kicks in.
+  const src = `${video.driveUrl}#t=0.1`
+  return (
+    <div className="border-border/60 bg-brand-ink/5 relative aspect-9/16 w-full overflow-hidden rounded-lg border shadow-sm">
+      <video
+        key={video.id}
+        src={src}
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls
+        preload="metadata"
+        aria-label={video.title ?? 'Video'}
+        className="absolute inset-0 h-full w-full bg-black object-cover"
       />
-    )}
-    <span className="bg-brand-ink/25 group-hover:bg-brand-ink/35 absolute inset-0 flex items-center justify-center transition-colors">
-      <span className="bg-brand-copper flex size-14 items-center justify-center rounded-full text-white shadow-lg transition-transform duration-300 group-hover:scale-105">
-        <IconPlayerPlayFilled className="size-7" />
-      </span>
-    </span>
-  </button>
-)
+    </div>
+  )
+}
 
-const InstagramEmbed = ({ url, title }: { url: string; title: string | null }) => {
+const InstagramEmbed = ({
+  url,
+  title,
+}: {
+  url: string
+  title: string | null
+}) => {
   const permalink = toPermalink(url)
   return (
     <blockquote
@@ -96,13 +87,12 @@ const InstagramEmbed = ({ url, title }: { url: string; title: string | null }) =
 
 /**
  * Video slider — one video per slide with prev/next arrows, dot indicators and
- * slow auto-advance. Instagram reels use the official embed; Drive videos show a
- * poster that opens the full player in a modal (no cramped inline controls).
+ * slow auto-advance. Instagram reels use the official embed; uploaded (R2)
+ * videos play directly inline, muted + autoplay + loop.
  */
 export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
   const [index, setIndex] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
-  const [playing, setPlaying] = React.useState<string | null>(null)
 
   const count = videos.length
   const active = videos[index]
@@ -113,31 +103,17 @@ export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
     [count]
   )
 
-  // Slow auto-advance, paused on hover or while a video modal is open.
+  // Slow auto-advance, paused on hover.
   React.useEffect(() => {
-    if (count <= 1 || paused || playing) return
+    if (count <= 1 || paused) return
     const id = setInterval(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS)
     return () => clearInterval(id)
-  }, [count, paused, playing])
+  }, [count, paused])
 
   // (Re)process the Instagram embed whenever the active reel changes.
   React.useEffect(() => {
     if (isInstagram) window.instgrm?.Embeds.process()
   }, [isInstagram, index])
-
-  // Scroll lock + Esc close for the player modal.
-  React.useEffect(() => {
-    if (!playing) return
-    document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPlaying(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = ''
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [playing])
 
   if (!count) return null
 
@@ -147,12 +123,8 @@ export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {active.type === 'drive' && active.driveFileId ? (
-        <DrivePoster
-          key={active.id}
-          video={active}
-          onPlay={() => setPlaying(active.driveFileId)}
-        />
+      {active.type === 'drive' && active.driveUrl ? (
+        <InlineVideo key={active.id} video={active} />
       ) : active.instagramUrl ? (
         <InstagramEmbed
           key={active.id}
@@ -198,37 +170,6 @@ export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
             ))}
           </div>
         </>
-      )}
-
-      {/* Full-screen Drive player — room for the controls. */}
-      {playing && (
-        <div
-          onClick={() => setPlaying(null)}
-          className="bg-brand-ink/90 fixed inset-0 z-80 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            type="button"
-            onClick={() => setPlaying(null)}
-            aria-label="Close"
-            className="absolute top-4 right-4 rounded-md p-2 text-white/80 hover:text-white"
-          >
-            <IconX className="size-7" />
-          </button>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative aspect-9/16 max-h-[85vh] w-full max-w-[min(360px,85vw)] overflow-hidden rounded-lg bg-black"
-          >
-            <iframe
-              src={`https://drive.google.com/file/d/${playing}/preview`}
-              allow="autoplay"
-              allowFullScreen
-              title="Video"
-              className="absolute inset-0 h-full w-full"
-            />
-          </div>
-        </div>
       )}
 
       <Script
