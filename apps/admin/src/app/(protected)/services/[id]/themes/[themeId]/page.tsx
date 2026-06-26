@@ -19,7 +19,6 @@ import {
   IconBrandInstagram,
   IconPencil,
   IconPhotoPlus,
-  IconRefresh,
   IconStar,
   IconStarFilled,
   IconVideoPlus,
@@ -52,16 +51,6 @@ function instagramEmbedUrl(url: string | null | undefined): string | null {
   if (!m) return null
   const kind = m[1].toLowerCase() === 'reels' ? 'reel' : m[1].toLowerCase()
   return `https://www.instagram.com/${kind}/${m[2]}/embed`
-}
-
-/**
- * Build a Google Drive file preview URL — works for any public file the OAuth
- * user owns, including the videos we just uploaded. Returns null if there's
- * no drive_file_id (shouldn't happen for type='drive' rows).
- */
-function driveEmbedUrl(driveFileId: string | null | undefined): string | null {
-  if (!driveFileId) return null
-  return `https://drive.google.com/file/d/${driveFileId}/preview`
 }
 
 type IPageProps = {
@@ -176,7 +165,6 @@ const ThemeEditPage = ({ params }: IPageProps) => {
       })
       .catch((e: IApiError) => handleException(e))
       .finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, themeId])
 
   if (loading) {
@@ -578,12 +566,6 @@ function ThemeVideosSection({
     done: number
     total: number
   } | null>(null)
-  // Per-video reload counter — incrementing this for a videoId appends a fresh
-  // query param to the iframe src, forcing it to refetch (useful when Drive
-  // finishes transcoding a freshly-uploaded file and the preview is ready).
-  const [reloadKey, setReloadKey] = useState<Record<string, number>>({})
-  const bustEmbed = (videoId: string) =>
-    setReloadKey((r) => ({ ...r, [videoId]: (r[videoId] ?? 0) + 1 }))
   const [renameTarget, setRenameTarget] = useState<{
     id: string
     currentTitle: string
@@ -694,11 +676,8 @@ function ThemeVideosSection({
         <div>
           <h3 className="text-foreground text-lg font-semibold">Videos</h3>
           <p className="text-muted-foreground text-sm">
-            Click the star to set the cover video. Drive-uploaded videos usually
-            take 2&ndash;15 minutes to transcode for browser playback after
-            upload &mdash; if the preview says &ldquo;still being
-            processed&rdquo;, hit the reload icon on that card after a few
-            minutes.
+            Click the star to set the cover video. Uploaded videos play directly
+            here once the upload finishes.
           </p>
         </div>
         {canEdit && addingKind === null && (
@@ -800,23 +779,10 @@ function ThemeVideosSection({
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {videos.map((v) => {
-            const baseEmbedUrl =
-              v.type === 'instagram'
-                ? instagramEmbedUrl(v.instagramUrl)
-                : driveEmbedUrl(v.driveFileId)
-            // Append the reload counter as a cache-buster so clicking the
-            // refresh icon (Drive only) navigates the iframe to a "new" URL
-            // and Drive re-fetches its preview state.
-            const bust = reloadKey[v.id] ?? 0
-            const embedUrl =
-              baseEmbedUrl && bust > 0
-                ? `${baseEmbedUrl}${baseEmbedUrl.includes('?') ? '&' : '?'}_=${bust}`
-                : baseEmbedUrl
-            // Both types use a portrait-ish ratio so:
-            //   - Instagram reels (always 9:16) fit cleanly
-            //   - Drive's preview iframe has room for its own header chrome
-            //     PLUS the actual video, regardless of source orientation
-            //     (landscape videos get small letterboxing, portrait fits flush)
+            // Instagram reels use the official embed iframe; uploaded (R2)
+            // videos play directly with a native <video> element.
+            const instagramEmbed =
+              v.type === 'instagram' ? instagramEmbedUrl(v.instagramUrl) : null
             const aspectClass = 'aspect-[9/16]'
             return (
               <li
@@ -827,17 +793,26 @@ function ThemeVideosSection({
                     : 'border-border/40'
                 }`}
               >
-                {embedUrl ? (
+                {v.type === 'drive' && v.driveUrl ? (
+                  <div
+                    className={`bg-muted overflow-hidden rounded-md ${aspectClass}`}
+                  >
+                    <video
+                      src={v.driveUrl}
+                      controls
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="size-full bg-black object-cover"
+                    />
+                  </div>
+                ) : instagramEmbed ? (
                   <div
                     className={`bg-muted overflow-hidden rounded-md ${aspectClass}`}
                   >
                     <iframe
-                      src={embedUrl}
-                      title={
-                        v.type === 'instagram'
-                          ? `Instagram ${v.instagramUrl ?? ''}`
-                          : `Drive video ${v.driveFileId ?? ''}`
-                      }
+                      src={instagramEmbed}
+                      title={`Instagram ${v.instagramUrl ?? ''}`}
                       loading="lazy"
                       allow="autoplay; encrypted-media; picture-in-picture; web-share"
                       allowFullScreen
@@ -881,18 +856,6 @@ function ThemeVideosSection({
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    {v.type === 'drive' && baseEmbedUrl && (
-                      <Button
-                        type="button"
-                        variant="ghost-muted"
-                        size="sm"
-                        className="size-7 p-0"
-                        onClick={() => bustEmbed(v.id)}
-                        title="Reload preview (use after Drive transcoding finishes)"
-                      >
-                        <IconRefresh className="size-4" />
-                      </Button>
-                    )}
                     {canEdit && (
                       <>
                         {!v.isFeatured && (
@@ -934,11 +897,7 @@ function ThemeVideosSection({
                                   : ''),
                             })
                           }
-                          title={
-                            v.type === 'drive'
-                              ? 'Rename (also renames on Drive)'
-                              : 'Rename'
-                          }
+                          title="Rename"
                         >
                           <IconPencil className="size-4" />
                         </Button>
