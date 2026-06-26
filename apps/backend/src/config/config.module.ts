@@ -29,14 +29,14 @@ const envSchema = z.object({
   ADMIN_GOOGLE_CLIENT_SECRET: z.string().optional(),
   ADMIN_GOOGLE_CALLBACK_URL: z.string().url().optional(),
 
-  // Google Drive media storage — OAuth as the human owner of the Drive folder.
-  // Service-account auth doesn't work on personal (non-Workspace) Drives.
-  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
-  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
-  GOOGLE_DRIVE_ROOT_FOLDER_ID: z.string().optional(),
-  // Legacy: kept for backward compat but the OAuth flow above is preferred.
-  GOOGLE_DRIVE_KEY_FILE: z.string().optional(),
+  // Cloudflare R2 media storage (S3-compatible API).
+  // Create an R2 API token in the Cloudflare dashboard for the access keys.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  // Public base URL the bucket is served from (r2.dev URL or custom domain).
+  R2_PUBLIC_URL: z.string().url().optional(),
 
   MAIL_HOST: z.string(),
   MAIL_PORT: z.coerce.number().default(465),

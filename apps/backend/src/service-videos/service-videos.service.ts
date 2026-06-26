@@ -9,7 +9,7 @@ import { mediaFiles } from '../database/schema/media-files.table.js';
 import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { services } from '../database/schema/services.table.js';
-import { DriveService } from '../upload/drive.service.js';
+import { R2Service } from '../upload/r2.service.js';
 import { RevalidationService } from '../common/services/revalidation.service.js';
 import type { CreateServiceVideoDto } from './dto/create-service-video.dto.js';
 import type { ReorderServiceVideoItemDto } from './dto/reorder-service-videos.dto.js';
@@ -35,7 +35,7 @@ const videoColumns = {
 export class ServiceVideosService {
   constructor(
     private readonly drizzle: DrizzleService,
-    private readonly driveService: DriveService,
+    private readonly r2Service: R2Service,
     private readonly revalidationService: RevalidationService,
   ) {}
 
@@ -51,6 +51,27 @@ export class ServiceVideosService {
     let driveFileId: string | null = null;
     let driveUrl: string | null = null;
 
+    // If a themeId is provided, confirm it belongs to this service (do this
+    // before the upload so we can name the R2 object th-<themeNum>-NN).
+    let theme: { id: string; name: string } | null = null;
+    if (dto.themeId) {
+      const [row] = await this.drizzle.db
+        .select({ id: serviceThemes.id, name: serviceThemes.name })
+        .from(serviceThemes)
+        .where(
+          and(
+            eq(serviceThemes.id, dto.themeId),
+            eq(serviceThemes.serviceId, serviceId),
+          ),
+        )
+        .limit(1);
+      if (!row)
+        throw new BadRequestException(
+          'Theme does not belong to this service',
+        );
+      theme = row;
+    }
+
     if (dto.type === 'instagram') {
       if (!dto.instagramUrl)
         throw new BadRequestException(
@@ -62,27 +83,33 @@ export class ServiceVideosService {
         throw new BadRequestException(
           'A video file is required for a drive video',
         );
-      const uploaded = await this.driveService.uploadVideo(file, service.name);
+
+      // Readable R2 key for theme videos: th-<themeNum>-NN. Sequence continues
+      // past existing videos already in this theme.
+      let nameOpts: { namePrefix: string; startSeq: number } | undefined;
+      if (theme) {
+        const [{ count: videoCount }] = await this.drizzle.db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(serviceVideos)
+          .where(
+            and(
+              eq(serviceVideos.serviceId, serviceId),
+              eq(serviceVideos.themeId, theme.id),
+            ),
+          );
+        nameOpts = {
+          namePrefix: `th-${this.themeNumber(theme.name)}`,
+          startSeq: videoCount + 1,
+        };
+      }
+
+      const uploaded = await this.r2Service.uploadVideo(
+        file,
+        service.name,
+        nameOpts,
+      );
       driveFileId = uploaded.driveFileId;
       driveUrl = uploaded.driveUrl;
-    }
-
-    // If a themeId is provided, confirm it belongs to this service before insert.
-    if (dto.themeId) {
-      const [theme] = await this.drizzle.db
-        .select({ id: serviceThemes.id })
-        .from(serviceThemes)
-        .where(
-          and(
-            eq(serviceThemes.id, dto.themeId),
-            eq(serviceThemes.serviceId, serviceId),
-          ),
-        )
-        .limit(1);
-      if (!theme)
-        throw new BadRequestException(
-          'Theme does not belong to this service',
-        );
     }
 
     // sort_order = max(existing) + 1
@@ -208,10 +235,11 @@ export class ServiceVideosService {
     if (!video || video.serviceId !== serviceId)
       throw new NotFoundException('Service video not found');
 
-    // For a drive video, delete the underlying Drive file first (by its drive
-    // file id — there is no media_files row to route through).
+    // For an uploaded video, delete the underlying R2 object first (by its
+    // object key, stored in driveFileId — there is no media_files row to route
+    // through).
     if (video.type === 'drive' && video.driveFileId) {
-      await this.driveService.deleteDriveFile(video.driveFileId);
+      await this.r2Service.deleteDriveFile(video.driveFileId);
     }
 
     await this.drizzle.db
@@ -339,9 +367,9 @@ export class ServiceVideosService {
   }
 
   /**
-   * Rename a video. For Drive videos, the file is also renamed on Drive so
-   * the user's Drive folder stays organised. For Instagram-linked videos,
-   * only the DB title is updated (no file to rename).
+   * Rename a video. Only the DB title is updated — R2 objects are immutable
+   * and renaming would change the public URL, so storage is left untouched
+   * (renameFile is a no-op on R2). Instagram-linked videos have no file either.
    */
   async rename(videoId: string, serviceId: string, title: string) {
     const [video] = await this.drizzle.db
@@ -356,7 +384,7 @@ export class ServiceVideosService {
     if (!trimmed) throw new BadRequestException('Title cannot be empty');
 
     if (video.type === 'drive' && video.driveFileId) {
-      await this.driveService.renameFile(video.driveFileId, trimmed);
+      await this.r2Service.renameFile(video.driveFileId, trimmed);
     }
 
     await this.drizzle.db
@@ -425,5 +453,12 @@ export class ServiceVideosService {
         'Cannot modify videos of a deleted service',
       );
     return service;
+  }
+
+  /** `baby-theme-07` → `07`; falls back to `01`. Zero-padded to 2+ digits. */
+  private themeNumber(themeName: string): string {
+    const m = themeName.match(/(\d+)\s*$/);
+    const n = m ? parseInt(m[1], 10) : 1;
+    return n < 100 ? String(n).padStart(2, '0') : String(n);
   }
 }

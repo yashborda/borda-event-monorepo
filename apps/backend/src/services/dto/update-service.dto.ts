@@ -28,9 +28,8 @@ export class UpdateServiceDto {
   coverImageId?: string | null;
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  basePrice?: number | null;
+  @IsUUID()
+  bannerImageId?: string | null;
 
   @IsOptional()
   @IsBoolean()

@@ -43,6 +43,13 @@
       "when": 1781424479102,
       "tag": "0005_service_video_title",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0006_service_banner_drop_baseprice",
+      "breakpoints": true
     }
   ]
 }

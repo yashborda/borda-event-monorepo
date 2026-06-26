@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DrizzleService } from '../database/drizzle.service.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { services } from '../database/schema/services.table.js';
@@ -100,6 +100,43 @@ export class ServiceThemesService {
     return { message: 'Theme deleted' };
   }
 
+  /**
+   * Delete multiple themes at once. Every id must belong to this service or the
+   * whole call is rejected (no partial deletes). Attached media/videos unlink
+   * via ON DELETE cascade, same as single remove. Returns the deleted count.
+   */
+  async bulkRemove(serviceId: string, themeIds: string[]) {
+    const service = await this.getServiceOrThrow(serviceId);
+
+    const ids = Array.from(new Set(themeIds));
+    const owned = await this.drizzle.db
+      .select({ id: serviceThemes.id })
+      .from(serviceThemes)
+      .where(
+        and(
+          eq(serviceThemes.serviceId, serviceId),
+          inArray(serviceThemes.id, ids),
+        ),
+      );
+
+    if (owned.length !== ids.length)
+      throw new BadRequestException(
+        'One or more themes do not belong to this service',
+      );
+
+    await this.drizzle.db
+      .delete(serviceThemes)
+      .where(
+        and(
+          eq(serviceThemes.serviceId, serviceId),
+          inArray(serviceThemes.id, ids),
+        ),
+      );
+
+    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    return { message: `${ids.length} theme(s) deleted`, count: ids.length };
+  }
+
   async reorder(serviceId: string, themeIds: string[]) {
     const service = await this.getServiceOrThrow(serviceId);
 
@@ -160,6 +197,66 @@ export class ServiceThemesService {
     while (used.has(next)) next++;
     const pad = next < 100 ? String(next).padStart(2, '0') : String(next);
     return `${namePrefix}${pad}`;
+  }
+
+  /**
+   * Default number of empty placeholder themes a service starts with — created
+   * on service creation and topped up by the themes seeder.
+   */
+  static readonly DEFAULT_THEME_COUNT = 100;
+
+  /**
+   * Bulk-create empty (name-only) themes so the service has up to `target`
+   * total. Names follow the same `<prefix>-theme-NN` convention as the manual
+   * "Add Theme" flow, filling the smallest unused suffixes. Idempotent: if the
+   * service already has >= target themes, nothing happens. Returns how many
+   * were created. Accepts an optional executor (`tx`) to run inside a caller's
+   * transaction.
+   */
+  async createDefaultThemes(
+    serviceId: string,
+    serviceSlug: string,
+    target = ServiceThemesService.DEFAULT_THEME_COUNT,
+    createdById?: string,
+    executor: Pick<typeof this.drizzle.db, 'select' | 'insert'> = this.drizzle
+      .db,
+  ): Promise<number> {
+    const prefix = (serviceSlug.split('-')[0] || 'theme').toLowerCase();
+    const namePrefix = `${prefix}-theme-`;
+
+    const existing = await executor
+      .select({ name: serviceThemes.name, sortOrder: serviceThemes.sortOrder })
+      .from(serviceThemes)
+      .where(eq(serviceThemes.serviceId, serviceId));
+
+    if (existing.length >= target) return 0;
+
+    const used = new Set<number>();
+    let maxOrder = -1;
+    for (const { name, sortOrder } of existing) {
+      if (sortOrder > maxOrder) maxOrder = sortOrder;
+      if (!name.startsWith(namePrefix)) continue;
+      const n = parseInt(name.slice(namePrefix.length), 10);
+      if (Number.isFinite(n)) used.add(n);
+    }
+
+    const toCreate = target - existing.length;
+    const values: (typeof serviceThemes.$inferInsert)[] = [];
+    let next = 1;
+    for (let i = 0; i < toCreate; i++) {
+      while (used.has(next)) next++;
+      used.add(next);
+      const pad = next < 100 ? String(next).padStart(2, '0') : String(next);
+      values.push({
+        serviceId,
+        name: `${namePrefix}${pad}`,
+        sortOrder: ++maxOrder,
+        createdBy: createdById,
+      });
+    }
+
+    await executor.insert(serviceThemes).values(values);
+    return values.length;
   }
 
   private serialize(t: typeof serviceThemes.$inferSelect) {

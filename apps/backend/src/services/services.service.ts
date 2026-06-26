@@ -27,7 +27,8 @@ import { services } from '../database/schema/services.table.js';
 import { generateSlug } from '../common/utils/slug.util.js';
 import { RevalidationService } from '../common/services/revalidation.service.js';
 import { UploadService } from '../upload/upload.service.js';
-import { DriveService } from '../upload/drive.service.js';
+import { R2Service } from '../upload/r2.service.js';
+import { ServiceThemesService } from './service-themes.service.js';
 import type { CreateServiceDto } from './dto/create-service.dto.js';
 import type { UpdateServiceDto } from './dto/update-service.dto.js';
 import type { ReorderServiceMediaDto } from './dto/reorder-service-media.dto.js';
@@ -59,7 +60,8 @@ export class ServicesService {
     private readonly drizzle: DrizzleService,
     private readonly revalidationService: RevalidationService,
     private readonly uploadService: UploadService,
-    private readonly driveService: DriveService,
+    private readonly r2Service: R2Service,
+    private readonly serviceThemesService: ServiceThemesService,
   ) {}
 
   async listAll(
@@ -76,11 +78,9 @@ export class ServicesService {
     const sortColumn =
       sortBy === 'name'
         ? services.name
-        : sortBy === 'basePrice'
-          ? services.basePrice
-          : sortBy === 'sortOrder'
-            ? services.sortOrder
-            : sortBy === 'createdAt'
+        : sortBy === 'sortOrder'
+          ? services.sortOrder
+          : sortBy === 'createdAt'
               ? services.createdAt
               : sortBy === 'deletedAt'
                 ? services.deletedAt
@@ -128,7 +128,6 @@ export class ServicesService {
           coverImageOriginalName: coverImg.originalName,
           coverImageMimeType: coverImg.mimeType,
           coverImageSize: coverImg.size,
-          basePrice: services.basePrice,
           isActive: services.isActive,
           sortOrder: services.sortOrder,
           createdBy: services.createdBy,
@@ -168,7 +167,6 @@ export class ServicesService {
           mimeType: s.coverImageMimeType,
           size: s.coverImageSize,
         }),
-        basePrice: s.basePrice,
         isActive: s.isActive,
         sortOrder: s.sortOrder,
         createdBy: s.createdBy,
@@ -191,6 +189,7 @@ export class ServicesService {
     const createdByUser = alias(adminUsers, 'created_by_user');
     const deletedByUser = alias(adminUsers, 'deleted_by_user');
     const coverImg = alias(mediaFiles, 'cover_img');
+    const bannerImg = alias(mediaFiles, 'banner_img');
 
     const [s] = await this.drizzle.db
       .select({
@@ -204,7 +203,12 @@ export class ServicesService {
         coverImageOriginalName: coverImg.originalName,
         coverImageMimeType: coverImg.mimeType,
         coverImageSize: coverImg.size,
-        basePrice: services.basePrice,
+        bannerImageId: bannerImg.id,
+        bannerImageUrl: bannerImg.url,
+        bannerImageFolder: bannerImg.folder,
+        bannerImageOriginalName: bannerImg.originalName,
+        bannerImageMimeType: bannerImg.mimeType,
+        bannerImageSize: bannerImg.size,
         isActive: services.isActive,
         sortOrder: services.sortOrder,
         createdBy: services.createdBy,
@@ -220,6 +224,7 @@ export class ServicesService {
       .leftJoin(createdByUser, eq(services.createdBy, createdByUser.id))
       .leftJoin(deletedByUser, eq(services.deletedBy, deletedByUser.id))
       .leftJoin(coverImg, eq(services.coverImageId, coverImg.id))
+      .leftJoin(bannerImg, eq(services.bannerImageId, bannerImg.id))
       .where(eq(services.id, id))
       .limit(1);
 
@@ -243,7 +248,14 @@ export class ServicesService {
         mimeType: s.coverImageMimeType,
         size: s.coverImageSize,
       }),
-      basePrice: s.basePrice,
+      bannerImage: mediaObject({
+        id: s.bannerImageId,
+        url: s.bannerImageUrl,
+        folder: s.bannerImageFolder,
+        originalName: s.bannerImageOriginalName,
+        mimeType: s.bannerImageMimeType,
+        size: s.bannerImageSize,
+      }),
       isActive: s.isActive,
       sortOrder: s.sortOrder,
       createdBy: s.createdBy,
@@ -277,12 +289,21 @@ export class ServicesService {
         slug,
         description: dto.description,
         coverImageId: dto.coverImageId,
-        basePrice: dto.basePrice,
+        bannerImageId: dto.bannerImageId,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
         createdBy: createdById,
       })
       .returning();
+
+    // Every new service starts with a full set of empty placeholder themes
+    // (baby-theme-01 … baby-theme-100) the admin can fill in later.
+    await this.serviceThemesService.createDefaultThemes(
+      service.id,
+      service.slug,
+      ServiceThemesService.DEFAULT_THEME_COUNT,
+      createdById,
+    );
 
     const result = await this.findOne(service.id);
     this.revalidationService.revalidate(['services', `service-${result.slug}`]);
@@ -315,9 +336,18 @@ export class ServicesService {
       dto.coverImageId !== existing.coverImageId &&
       existing.coverImageId
     ) {
-      // driveService.deleteFile drops the Drive file (if any) + the media_files
-      // row; safe to call for both Drive-backed and legacy local media.
-      await this.driveService.deleteFile(existing.coverImageId);
+      // r2Service.deleteFile drops the R2 object (if any) + the media_files
+      // row; safe to call for both R2-backed and legacy local media.
+      await this.r2Service.deleteFile(existing.coverImageId);
+    }
+
+    // Same cleanup for the banner image when it's being replaced/cleared.
+    if (
+      dto.bannerImageId !== undefined &&
+      dto.bannerImageId !== existing.bannerImageId &&
+      existing.bannerImageId
+    ) {
+      await this.r2Service.deleteFile(existing.bannerImageId);
     }
 
     await this.drizzle.db
@@ -329,7 +359,9 @@ export class ServicesService {
         ...(dto.coverImageId !== undefined && {
           coverImageId: dto.coverImageId,
         }),
-        ...(dto.basePrice !== undefined && { basePrice: dto.basePrice }),
+        ...(dto.bannerImageId !== undefined && {
+          bannerImageId: dto.bannerImageId,
+        }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
         updatedAt: new Date(),
@@ -408,7 +440,10 @@ export class ServicesService {
     await this.drizzle.db.delete(services).where(eq(services.id, id));
 
     if (service.coverImageId) {
-      await this.driveService.deleteFile(service.coverImageId);
+      await this.r2Service.deleteFile(service.coverImageId);
+    }
+    if (service.bannerImageId) {
+      await this.r2Service.deleteFile(service.bannerImageId);
     }
 
     this.revalidationService.revalidate(['services', `service-${service.slug}`]);
@@ -423,11 +458,31 @@ export class ServicesService {
   ) {
     const service = await this.getServiceOrThrow(id);
 
-    if (themeId) await this.assertThemeBelongsToService(id, themeId);
+    // For theme media, derive a readable R2 key prefix `th-<themeNum>` and the
+    // next sequence number so files land as e.g. baby-shower/th-01-03.jpg.
+    let nameOpts: { namePrefix: string; startSeq: number } | undefined;
+    if (themeId) {
+      const theme = await this.assertThemeBelongsToService(id, themeId);
+      const themeNum = this.themeNumber(theme.name);
+      const [{ count: mediaCount }] = await this.drizzle.db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(serviceMedia)
+        .where(
+          and(
+            eq(serviceMedia.serviceId, id),
+            eq(serviceMedia.themeId, themeId),
+          ),
+        );
+      nameOpts = { namePrefix: `th-${themeNum}`, startSeq: mediaCount + 1 };
+    }
 
-    // Upload to Drive (subfolder = service name); this inserts the media_files
-    // row (with drive_file_id + url) and returns it.
-    const media = await this.driveService.uploadImage(file, service.name);
+    // Upload to R2 (subfolder = service name); this inserts the media_files
+    // row (with the R2 object key in drive_file_id + url) and returns it.
+    const media = await this.r2Service.uploadImage(
+      file,
+      service.name,
+      nameOpts,
+    );
 
     const [{ maxOrder }] = await this.drizzle.db
       .select({
@@ -527,7 +582,7 @@ export class ServicesService {
     themeId: string,
   ) {
     const [t] = await this.drizzle.db
-      .select({ id: serviceThemes.id })
+      .select({ id: serviceThemes.id, name: serviceThemes.name })
       .from(serviceThemes)
       .where(
         and(
@@ -537,13 +592,24 @@ export class ServicesService {
       )
       .limit(1);
     if (!t) throw new BadRequestException('Theme does not belong to this service');
+    return t;
   }
 
   /**
-   * Rename a photo attached to a service: updates media_files.original_name +
-   * the Drive file name itself (so the user's Drive stays organised). Drive
-   * rename happens first; if it fails we propagate the error and skip the DB
-   * write to keep the two in sync.
+   * Pull the numeric suffix out of a theme name like `baby-theme-07` → `07`.
+   * Falls back to `01` if the name has no trailing number. Always 2+ digits,
+   * zero-padded, so R2 keys sort/group naturally (th-01, th-02 … th-100).
+   */
+  private themeNumber(themeName: string): string {
+    const m = themeName.match(/(\d+)\s*$/);
+    const n = m ? parseInt(m[1], 10) : 1;
+    return n < 100 ? String(n).padStart(2, '0') : String(n);
+  }
+
+  /**
+   * Rename a photo attached to a service: updates media_files.original_name.
+   * R2 objects are immutable (renaming would change the public URL), so the
+   * stored file is left untouched — only the display name changes.
    */
   async renameMedia(serviceId: string, mediaId: string, newName: string) {
     const service = await this.getServiceOrThrow(serviceId);
@@ -575,7 +641,7 @@ export class ServicesService {
     if (!trimmed) throw new BadRequestException('Name cannot be empty');
 
     if (mediaRow.driveFileId) {
-      await this.driveService.renameFile(mediaRow.driveFileId, trimmed);
+      await this.r2Service.renameFile(mediaRow.driveFileId, trimmed);
     }
 
     await this.drizzle.db
@@ -609,9 +675,9 @@ export class ServicesService {
     if (!attached)
       throw new NotFoundException('Media is not attached to this service');
 
-    // Deletes the Drive file (by drive_file_id) + the media_files row; the
+    // Deletes the R2 object (by drive_file_id) + the media_files row; the
     // service_media junction is removed via ON DELETE cascade.
-    await this.driveService.deleteFile(mediaId);
+    await this.r2Service.deleteFile(mediaId);
 
     // If we just deleted the featured photo for a theme, auto-promote the next
     // remaining photo in that theme by sortOrder. The user's expectation:

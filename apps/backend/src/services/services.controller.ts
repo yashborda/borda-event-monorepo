@@ -30,6 +30,7 @@ import { RenameServiceMediaDto } from './dto/rename-service-media.dto.js';
 import { CreateServiceThemeDto } from './dto/create-service-theme.dto.js';
 import { UpdateServiceThemeDto } from './dto/update-service-theme.dto.js';
 import { ReorderServiceThemesDto } from './dto/reorder-service-themes.dto.js';
+import { BulkDeleteServiceThemesDto } from './dto/bulk-delete-service-themes.dto.js';
 
 @Controller('admin/services')
 @UseGuards(AuthGuard('admin-jwt'), PermissionsGuard)
@@ -173,6 +174,15 @@ export class ServicesController {
     @Body() dto: ReorderServiceThemesDto,
   ) {
     return this.themesService.reorder(id, dto.themeIds);
+  }
+
+  @Post(':id/themes/bulk-delete')
+  @RequirePermissions('services:update')
+  bulkDeleteThemes(
+    @Param('id') id: string,
+    @Body() dto: BulkDeleteServiceThemesDto,
+  ) {
+    return this.themesService.bulkRemove(id, dto.themeIds);
   }
 
   @Patch(':id/themes/:themeId')

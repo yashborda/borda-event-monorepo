@@ -46,6 +46,9 @@ type IDataTableProps<T> = {
   sort?: ISort | null
   onSortChange?: (key: string, dir: ISortDir) => void
   maxHeight?: string
+  /** When set, clicking a row invokes this. Cells with interactive controls
+   *  should call stopPropagation to opt out. */
+  onRowClick?: (row: T) => void
 }
 
 const SortIcon = ({
@@ -78,6 +81,7 @@ const DataTable = <T,>({
   sort,
   onSortChange,
   maxHeight = '615px',
+  onRowClick,
 }: IDataTableProps<T>) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = (page - 1) * pageSize
@@ -169,7 +173,11 @@ const DataTable = <T,>({
               data.map((row) => (
                 <tr
                   key={rowKey(row)}
-                  className="border-border hover:bg-muted/40 border-t transition-colors"
+                  className={cn(
+                    'border-border hover:bg-muted/40 border-t transition-colors',
+                    onRowClick && 'cursor-pointer'
+                  )}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((col) => (
                     <td
