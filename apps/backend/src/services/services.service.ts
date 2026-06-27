@@ -842,7 +842,7 @@ export class ServicesService {
 
     // Media/videos are fetched BY themeId (not serviceId), so a shared theme's
     // photos/videos surface in every service it's linked to.
-    const [mediaRows, videoRows] = await Promise.all([
+    const [mediaRows, videoRows, linkRows] = await Promise.all([
       this.drizzle.db
         .select({
           themeId: serviceMedia.themeId,
@@ -874,7 +874,27 @@ export class ServicesService {
         .from(serviceVideos)
         .where(inArray(serviceVideos.themeId, themeIds))
         .orderBy(asc(serviceVideos.sortOrder)),
+      // Every service each theme is linked to — for the admin "Shared with"
+      // section / "Also in" badge.
+      this.drizzle.db
+        .select({
+          themeId: serviceThemeLinks.themeId,
+          id: services.id,
+          name: services.name,
+          slug: services.slug,
+        })
+        .from(serviceThemeLinks)
+        .innerJoin(services, eq(services.id, serviceThemeLinks.serviceId))
+        .where(inArray(serviceThemeLinks.themeId, themeIds))
+        .orderBy(asc(services.name)),
     ]);
+
+    const servicesByTheme = new Map<string, typeof linkRows>();
+    for (const l of linkRows) {
+      const arr = servicesByTheme.get(l.themeId) ?? [];
+      arr.push(l);
+      servicesByTheme.set(l.themeId, arr);
+    }
 
     const mediaByTheme = new Map<string, typeof mediaRows>();
     for (const m of mediaRows) {
@@ -901,6 +921,11 @@ export class ServicesService {
       sortOrder: linkSortByTheme.get(t.id) ?? t.sortOrder,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
+      linkedServices: (servicesByTheme.get(t.id) ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        slug: s.slug,
+      })),
       media: (mediaByTheme.get(t.id) ?? []).map((m) => ({
         id: m.id,
         url: m.url,
