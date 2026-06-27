@@ -1,5 +1,5 @@
 import type { IServiceDetail, IServiceThemeVideo } from '@pkg/types'
-import { Button, cn } from '@pkg/ui'
+import { Button } from '@pkg/ui'
 import {
   IconBrandWhatsapp,
   IconCheck,
@@ -21,8 +21,8 @@ import { RESOURCE_COVERS, RESOURCE_GALLERY } from '@/content/media'
 import { FEATURED_SERVICES } from '@/content/services'
 
 import { WhatsAppCta } from '../../_components/whatsapp-cta'
-import { type GalleryImage, PhotoSlider } from './_components/photo-slider'
-import { ThemeVideos } from './_components/theme-videos'
+import { type GalleryImage } from './_components/photo-slider'
+import { ThemePriceBuckets } from './_components/theme-price-buckets'
 
 type Props = { params: Promise<{ slug: string }> }
 
@@ -30,6 +30,7 @@ type ThemeSection = {
   key: string
   title: string | null
   description: string | null
+  price: number | null
   images: GalleryImage[]
   videos: IServiceThemeVideo[]
 }
@@ -66,6 +67,7 @@ const buildSections = (
         key: theme.id,
         title: theme.name,
         description: theme.description,
+        price: theme.price,
         images: [...theme.media]
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .map((m) => ({ src: m.url, alt: `${name} — ${theme.name}` })),
@@ -80,6 +82,7 @@ const buildSections = (
         key: 'gallery',
         title: null,
         description: null,
+        price: null,
         images: [...detail.media]
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .map((m) => ({ src: m.url, alt: name })),
@@ -95,6 +98,7 @@ const buildSections = (
         key: 'gallery',
         title: null,
         description: null,
+        price: null,
         images: local.map((src) => ({ src, alt: name })),
         videos: [],
       },
@@ -102,6 +106,63 @@ const buildSections = (
   }
 
   return []
+}
+
+const BUCKET_SIZE = 5000
+
+type PriceBucket = {
+  key: string
+  /** Inclusive lower bound in ₹, or null for the unpriced "Other" group. */
+  min: number | null
+  label: string
+  sections: ThemeSection[]
+}
+
+/**
+ * Group theme sections into ₹5000 price bands (0–5k, 5–10k, …) by their price,
+ * plus a trailing "Other" group for themes with no price set. Empty bands are
+ * dropped. Bands are ordered ascending; "Other" always sits last.
+ */
+const buildPriceBuckets = (sections: ThemeSection[]): PriceBucket[] => {
+  const byBand = new Map<number, ThemeSection[]>()
+  const other: ThemeSection[] = []
+
+  for (const s of sections) {
+    if (s.price == null) {
+      other.push(s)
+      continue
+    }
+    const band = Math.floor(s.price / BUCKET_SIZE)
+    const arr = byBand.get(band) ?? []
+    arr.push(s)
+    byBand.set(band, arr)
+  }
+
+  const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
+
+  const buckets: PriceBucket[] = [...byBand.keys()]
+    .sort((a, b) => a - b)
+    .map((band) => {
+      const min = band * BUCKET_SIZE
+      const max = min + BUCKET_SIZE
+      return {
+        key: `band-${band}`,
+        min,
+        label: `${inr(min)} – ${inr(max)}`,
+        sections: byBand.get(band)!,
+      }
+    })
+
+  if (other.length > 0) {
+    buckets.push({
+      key: 'other',
+      min: null,
+      label: 'Other themes',
+      sections: other,
+    })
+  }
+
+  return buckets
 }
 
 const ServiceDetailPage = async ({ params }: Props) => {
@@ -123,6 +184,7 @@ const ServiceDetailPage = async ({ params }: Props) => {
     null
 
   const sections = buildSections(detail, slug, name)
+  const buckets = buildPriceBuckets(sections)
 
   return (
     <main>
@@ -232,75 +294,20 @@ const ServiceDetailPage = async ({ params }: Props) => {
         </section>
       )}
 
-      {/* Theme sections: cover + extra images + videos */}
-      {sections.length > 0 && (
+      {/* Themes grouped into ₹5000 price bands (collapsible). Each theme shows
+          its cover + extra photos slider, with its video beside on desktop. */}
+      {buckets.length > 0 && (
         <section className="bg-muted/30 px-6 py-14 md:py-20">
-          <div className="mx-auto max-w-6xl space-y-8 md:space-y-14">
-            {sections.map((section) => {
-              const hasPhotos = section.images.length > 0
-              const hasVideos = section.videos.length > 0
-              // Photos only → a 3-up horizontal slider at every breakpoint.
-              // With a video → a photo slider on the LEFT, video on the RIGHT:
-              //   • mobile: VERTICAL 2-up, filling the video's portrait height
-              //     (no empty gap below a short horizontal strip);
-              //   • tablet: horizontal 3-up;  • desktop: horizontal 4-up.
-              const split = hasPhotos && hasVideos
-              const perView = split
-                ? { base: 2, sm: 3, lg: 4 }
-                : { base: 3, sm: 3, lg: 3 }
-              // Vertical only on mobile in the split case.
-              const vertical = split
-                ? { base: true, sm: false, lg: false }
-                : false
-              return (
-                <div key={section.key}>
-                  {/* <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
-                    {section.title ?? (i === 0 ? 'Gallery' : `Theme ${i + 1}`)}
-                  </h2>
-                  {section.description && (
-                    <p className="text-muted-foreground text-body-md mt-2 max-w-2xl">
-                      {section.description}
-                    </p>
-                  )} */}
-
-                  {/* With a video: photo slider on the left, video on the
-                      right. Mobile is an even 2-col split (vertical photo slider
-                      matches the portrait video height); from `sm` up the photo
-                      slider gets more width so its 3 (tablet) / 4 (desktop)
-                      horizontal tiles stay a sensible size beside the video.
-                      Without a video: one 3-up slider so the row stays balanced. */}
-                  <div
-                    className={cn(
-                      'mt-6 grid items-start gap-4 sm:gap-6',
-                      split &&
-                        'grid-cols-2 sm:grid-cols-[3fr_1fr] lg:grid-cols-[4fr_1fr]'
-                    )}
-                  >
-                    {hasPhotos && (
-                      // Split case: on mobile the photo column takes the video's
-                      // portrait height (aspect-9/16) so the vertical slider's
-                      // h-full resolves and the columns line up. From `sm` up the
-                      // slider is horizontal and sizes itself, so drop the aspect.
-                      <div
-                        className={cn(split && 'aspect-9/16 sm:aspect-auto')}
-                      >
-                        <PhotoSlider
-                          images={section.images}
-                          perView={perView}
-                          vertical={vertical}
-                        />
-                      </div>
-                    )}
-                    {hasVideos && (
-                      <div>
-                        <ThemeVideos videos={section.videos} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+          <div className="mx-auto mb-8 max-w-6xl">
+            <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
+              Themes &amp; pricing
+            </h2>
+            <p className="text-muted-foreground text-body-md mt-2">
+              Browse {name.toLowerCase()} themes by budget — tap a price range
+              to see its photos and videos.
+            </p>
           </div>
+          <ThemePriceBuckets buckets={buckets} />
         </section>
       )}
 

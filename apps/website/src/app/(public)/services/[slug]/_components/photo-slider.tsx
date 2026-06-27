@@ -85,10 +85,20 @@ export const PhotoSlider = ({
   const setLightbox = (open: boolean) => setLightboxIndex(open ? index : -1)
 
   const count = images.length
-  // Never show more lanes than we have photos (a 3-up with 1 photo degrades to
-  // a normal full-width slider).
-  const lanes = Math.max(1, Math.min(lanesFor(perView, vw), count))
-  // Last index a window can start at so the final photo stays visible.
+  // Tile size is ALWAYS based on the breakpoint's per-view count, so each photo
+  // renders at a fixed size whether the theme has 1 photo or 20 — a single
+  // image no longer blows up to full width. We only ever shrink the visual lane
+  // count below the per-view value when there's just one photo (so it isn't a
+  // lonely third of the row); otherwise tiles keep their fixed footprint.
+  // `lanes` = the breakpoint's per-view count, used as the tile-size unit so a
+  // tile is the SAME fixed size regardless of how many photos a theme has.
+  const lanes = Math.max(1, lanesFor(perView, vw))
+  // How many tiles are actually filled (≤ lanes). When fewer photos than lanes,
+  // the track is narrowed to this many tiles so each tile keeps its fixed size
+  // instead of one photo stretching across the whole row.
+  const visibleLanes = Math.min(lanes, count)
+  // Last index a window can start at so the final photo stays visible. Only the
+  // photos beyond what fits are slid through; if everything fits, no sliding.
   const maxStart = Math.max(0, count - lanes)
   const steps = maxStart + 1
   const go = React.useCallback(
@@ -142,18 +152,23 @@ export const PhotoSlider = ({
           // a gap between visible photos (per-slide padding). Lane count is
           // breakpoint-driven, so sizes are computed in JS.
           //
-          // Horizontal: the container uses an aspect ratio (lanes × tileAspect).
-          // Vertical: it fills the parent's height (h-full) and stacks tiles
-          // top-to-bottom, so it matches a tall video column beside it.
+          // Horizontal: each TILE is a fixed fraction (1/lanes) of a full row,
+          // so its size is constant no matter the photo count. When there are
+          // fewer photos than lanes the whole strip is narrowed to `visibleLanes`
+          // tiles (left-aligned) instead of one photo stretching full-width.
+          // Vertical: it fills the parent's height (h-full) and stacks tiles.
           <div
             className={cn(
-              'relative w-full overflow-hidden',
-              isVertical && 'h-full'
+              'relative overflow-hidden',
+              isVertical ? 'h-full w-full' : 'mr-auto'
             )}
             style={
               isVertical
                 ? undefined
-                : { aspectRatio: `${lanes * tileAspect} / 1` }
+                : {
+                    width: `${(visibleLanes / lanes) * 100}%`,
+                    aspectRatio: `${visibleLanes * tileAspect} / 1`,
+                  }
             }
           >
             <div
@@ -162,9 +177,12 @@ export const PhotoSlider = ({
                 isVertical ? 'h-full flex-col' : 'h-full'
               )}
               style={{
+                // Each tile is 1/visibleLanes of the (already-narrowed)
+                // container, so it lands at a fixed 1/lanes of the full row.
+                // Slide one tile per step.
                 transform: isVertical
-                  ? `translateY(-${(index * 100) / lanes}%)`
-                  : `translateX(-${(index * 100) / lanes}%)`,
+                  ? `translateY(-${(index * 100) / visibleLanes}%)`
+                  : `translateX(-${(index * 100) / visibleLanes}%)`,
               }}
             >
               {images.map((img, i) => (
@@ -179,8 +197,8 @@ export const PhotoSlider = ({
                   )}
                   style={
                     isVertical
-                      ? { height: `${100 / lanes}%` }
-                      : { width: `${100 / lanes}%` }
+                      ? { height: `${100 / visibleLanes}%` }
+                      : { width: `${100 / visibleLanes}%` }
                   }
                 >
                   <div className="border-border/60 bg-brand-ink/5 relative h-full w-full overflow-hidden rounded-lg border shadow-sm">
@@ -188,8 +206,8 @@ export const PhotoSlider = ({
                       src={img.src}
                       alt={img.alt}
                       fill
-                      sizes="(max-width: 640px) 33vw, (max-width: 1024px) 33vw, 22vw"
-                      priority={i < lanes}
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 22vw"
+                      loading="lazy"
                       className="object-cover"
                     />
                   </div>
@@ -211,7 +229,7 @@ export const PhotoSlider = ({
                 alt={img.alt}
                 fill
                 sizes="(max-width: 1024px) 50vw, 33vw"
-                priority={i === 0}
+                loading="lazy"
                 className={cn(
                   'object-cover transition-opacity duration-700',
                   i === index ? 'opacity-100' : 'opacity-0'
