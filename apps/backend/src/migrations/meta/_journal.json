@@ -50,6 +50,13 @@
       "when": 1782000000000,
       "tag": "0006_service_banner_drop_baseprice",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782500000000,
+      "tag": "0007_service_theme_links",
+      "breakpoints": true
     }
   ]
 }

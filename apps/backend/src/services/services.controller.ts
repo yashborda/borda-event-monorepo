@@ -168,6 +168,18 @@ export class ServicesController {
     );
   }
 
+  // Existing themes (from other services) NOT yet linked here — the picker for
+  // "add existing theme". Declared before the `:themeId` routes so the literal
+  // `available` segment is never captured as a themeId.
+  @Get(':id/themes/available')
+  @RequirePermissions('services:read')
+  listAvailableThemes(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+  ) {
+    return this.themesService.listAvailable(id, search);
+  }
+
   @Post(':id/themes')
   @RequirePermissions('services:update')
   createTheme(
@@ -191,6 +203,22 @@ export class ServicesController {
     @Body() dto: BulkDeleteServiceThemesDto,
   ) {
     return this.themesService.bulkRemove(id, dto.themeIds);
+  }
+
+  // Link an existing (shared) theme into this service. `:themeId/link` keeps the
+  // literal `link` segment after the id so it doesn't clash with PATCH/DELETE
+  // `:themeId`.
+  @Post(':id/themes/:themeId/link')
+  @RequirePermissions('services:update')
+  linkTheme(@Param('id') id: string, @Param('themeId') themeId: string) {
+    return this.themesService.linkExisting(id, themeId);
+  }
+
+  // Which services a theme appears in — for the admin "Also in …" badge.
+  @Get(':id/themes/:themeId/services')
+  @RequirePermissions('services:read')
+  themeServices(@Param('themeId') themeId: string) {
+    return this.themesService.listServicesForTheme(themeId);
   }
 
   @Patch(':id/themes/:themeId')

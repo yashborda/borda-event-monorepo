@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DrizzleService } from '../database/drizzle.service.js';
 import { mediaFiles } from '../database/schema/media-files.table.js';
 import { serviceMedia } from '../database/schema/service-media.table.js';
+import { serviceThemeLinks } from '../database/schema/service-theme-links.table.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { services } from '../database/schema/services.table.js';
@@ -127,7 +128,10 @@ export class WebsiteServicesService {
       })
       .from(serviceMedia)
       .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
-      .where(eq(serviceMedia.serviceId, s.id))
+      // Top-level gallery = service-level media only (no theme). Theme media is
+      // carried by fetchServiceThemes (keyed by themeId so shared themes bring
+      // their media along), so including it here too would double-list it.
+      .where(and(eq(serviceMedia.serviceId, s.id), isNull(serviceMedia.themeId)))
       .orderBy(asc(serviceMedia.sortOrder));
 
     const themes = await this.fetchServiceThemes(s.id);
@@ -169,14 +173,28 @@ export class WebsiteServicesService {
    * per-theme galleries set in the admin without an extra request.
    */
   private async fetchServiceThemes(serviceId: string) {
-    const themeRows = await this.drizzle.db
-      .select()
-      .from(serviceThemes)
-      .where(eq(serviceThemes.serviceId, serviceId))
-      .orderBy(asc(serviceThemes.sortOrder), asc(serviceThemes.createdAt));
+    // Themes via the link table (shared themes included), ordered by the
+    // per-service link sortOrder.
+    const themeRowsRaw = await this.drizzle.db
+      .select({ theme: serviceThemes, linkSort: serviceThemeLinks.sortOrder })
+      .from(serviceThemeLinks)
+      .innerJoin(
+        serviceThemes,
+        eq(serviceThemes.id, serviceThemeLinks.themeId),
+      )
+      .where(eq(serviceThemeLinks.serviceId, serviceId))
+      .orderBy(asc(serviceThemeLinks.sortOrder), asc(serviceThemes.createdAt));
 
-    if (themeRows.length === 0) return [];
+    if (themeRowsRaw.length === 0) return [];
 
+    const themeRows = themeRowsRaw.map((r) => r.theme);
+    const linkSortByTheme = new Map(
+      themeRowsRaw.map((r) => [r.theme.id, r.linkSort]),
+    );
+    const themeIds = themeRows.map((t) => t.id);
+
+    // Media/videos keyed BY themeId so a shared theme carries its photos/videos
+    // into every service it's linked to.
     const [mediaRows, videoRows] = await Promise.all([
       this.drizzle.db
         .select({
@@ -192,7 +210,7 @@ export class WebsiteServicesService {
         })
         .from(serviceMedia)
         .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
-        .where(eq(serviceMedia.serviceId, serviceId))
+        .where(inArray(serviceMedia.themeId, themeIds))
         .orderBy(asc(serviceMedia.sortOrder)),
       this.drizzle.db
         .select({
@@ -207,7 +225,7 @@ export class WebsiteServicesService {
           sortOrder: serviceVideos.sortOrder,
         })
         .from(serviceVideos)
-        .where(eq(serviceVideos.serviceId, serviceId))
+        .where(inArray(serviceVideos.themeId, themeIds))
         .orderBy(asc(serviceVideos.sortOrder)),
     ]);
 
@@ -233,7 +251,7 @@ export class WebsiteServicesService {
       name: t.name,
       description: t.description,
       price: t.price,
-      sortOrder: t.sortOrder,
+      sortOrder: linkSortByTheme.get(t.id) ?? t.sortOrder,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
       media: (mediaByTheme.get(t.id) ?? []).map((m) => ({

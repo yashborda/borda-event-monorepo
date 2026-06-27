@@ -16,11 +16,13 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronUp,
+  IconLink,
   IconLoader2,
   IconPencil,
   IconPhoto,
   IconPlus,
   IconSelector,
+  IconShare,
   IconTrash,
   IconUpload,
   IconVideo,
@@ -39,6 +41,8 @@ import { usePermissions } from '@/hooks/use-permissions'
 
 import { ImagePreviewDialog } from '@/components/image-preview-dialog'
 
+import { AddExistingThemeDialog } from './add-existing-theme-dialog'
+
 const PAGE_SIZE_OPTIONS = [
   { value: '10', label: '10' },
   { value: '20', label: '20' },
@@ -52,6 +56,10 @@ const themeCover = (theme: IServiceThemeWithMedia): string | null => {
   const featured = theme.media.find((m) => m.isFeatured)
   return (featured ?? theme.media[0])?.url ?? null
 }
+
+/** Other services this (shared) theme is linked to, excluding the current one. */
+const otherServices = (theme: IServiceThemeWithMedia, serviceId: string) =>
+  (theme.linkedServices ?? []).filter((s) => s.id !== serviceId)
 
 interface IPanelProps {
   serviceId: string
@@ -78,6 +86,7 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
   const [loading, setLoading] = useState(true) // first load only (skeleton)
   const [paging, setPaging] = useState(false) // page/sort change (dim rows)
   const [adding, setAdding] = useState(false)
+  const [addExistingOpen, setAddExistingOpen] = useState(false)
 
   // Inline price editing: themeId → draft string while focused.
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
@@ -328,13 +337,13 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
           `/api/admin/services/${serviceId}/themes/${deleteTarget.id}`,
           { method: 'DELETE' }
         )
-        toast.success('Theme deleted')
+        toast.success('Theme removed')
       } else {
         await apiFetch(`/api/admin/services/${serviceId}/themes/bulk-delete`, {
           method: 'POST',
           body: JSON.stringify({ themeIds: deleteTarget.ids }),
         })
-        toast.success(`${deleteTarget.ids.length} theme(s) deleted`)
+        toast.success(`${deleteTarget.ids.length} theme(s) removed`)
       }
       setSelected(new Set())
       setDeleteTarget(null)
@@ -348,6 +357,17 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
 
   const deleteCount =
     deleteTarget?.kind === 'bulk' ? deleteTarget.ids.length : 1
+
+  // For a single target, is the theme shared with other services? If so, this
+  // action only UNLINKS it here (the theme + its media survive elsewhere);
+  // otherwise it's the last copy and gets permanently deleted.
+  const singleTargetShared =
+    deleteTarget?.kind === 'single' &&
+    otherServices(
+      themes.find((t) => t.id === deleteTarget.id) ??
+        ({ linkedServices: [] } as unknown as IServiceThemeWithMedia),
+      serviceId
+    ).length > 0
 
   if (loading) {
     return (
@@ -379,10 +399,20 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
           </p>
         </div>
         {canEdit && (
-          <Button type="button" onClick={handleAdd} disabled={adding}>
-            <IconPlus className="size-4" />
-            {adding ? 'Creating…' : 'Add Theme'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddExistingOpen(true)}
+            >
+              <IconLink className="size-4" />
+              Add existing
+            </Button>
+            <Button type="button" onClick={handleAdd} disabled={adding}>
+              <IconPlus className="size-4" />
+              {adding ? 'Creating…' : 'Add Theme'}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -581,6 +611,21 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
                         >
                           {t.name}
                         </Link>
+                        {(() => {
+                          const shared = otherServices(t, serviceId)
+                          if (shared.length === 0) return null
+                          return (
+                            <p
+                              className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs"
+                              title={`Also in: ${shared.map((s) => s.name).join(', ')}`}
+                            >
+                              <IconShare className="size-3 shrink-0" />
+                              <span className="truncate">
+                                Also in {shared.map((s) => s.name).join(', ')}
+                              </span>
+                            </p>
+                          )
+                        })()}
                         {isUploading ? (
                           <p className="text-primary mt-0.5 flex items-center gap-1 text-xs">
                             <IconLoader2 className="size-3.5 animate-spin" />
@@ -735,6 +780,13 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
         </div>
       )}
 
+      <AddExistingThemeDialog
+        serviceId={serviceId}
+        open={addExistingOpen}
+        onOpenChange={setAddExistingOpen}
+        onLinked={reload}
+      />
+
       <ImagePreviewDialog
         open={!!preview}
         onOpenChange={(o) => !o && setPreview(null)}
@@ -745,11 +797,19 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
       <Dialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
-        title={deleteCount > 1 ? 'Delete themes' : 'Delete theme'}
+        title={
+          singleTargetShared
+            ? 'Remove theme from this service'
+            : deleteCount > 1
+              ? 'Remove themes'
+              : 'Delete theme'
+        }
         description={
           deleteTarget?.kind === 'single'
-            ? `Delete "${deleteTarget.name}"? Its photos and videos will also be removed. This cannot be undone.`
-            : `Delete ${deleteCount} selected theme(s)? Their photos and videos will also be removed. This cannot be undone.`
+            ? singleTargetShared
+              ? `"${deleteTarget.name}" is shared with other services. This only removes it from THIS service — the theme and its photos/videos stay in the others.`
+              : `Delete "${deleteTarget.name}"? This is its only service, so the theme and its photos and videos will be permanently removed. This cannot be undone.`
+            : `Remove ${deleteCount} selected theme(s) from this service? Any that aren't shared elsewhere will be permanently deleted along with their photos and videos.`
         }
         actions={[
           {
@@ -760,7 +820,11 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
             className: 'ml-auto',
           },
           {
-            label: deleting ? 'Deleting…' : 'Yes, delete',
+            label: deleting
+              ? 'Working…'
+              : singleTargetShared
+                ? 'Remove from service'
+                : 'Yes, delete',
             variant: 'destructive',
             onClick: confirmDelete,
             disabled: deleting,

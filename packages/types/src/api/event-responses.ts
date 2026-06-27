@@ -71,9 +71,21 @@ export type IServiceTheme = {
   updatedAt: string;
 };
 
+/** A service a theme is linked to — used for the admin "Also in …" badge. */
+export type IThemeLinkedService = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export type IServiceThemeWithMedia = IServiceTheme & {
   media: (IMediaFile & { sortOrder: number; isFeatured: boolean })[];
   videos: IServiceThemeVideo[];
+  /**
+   * Every service this (shared) theme is linked to, including the current one.
+   * A length > 1 means the theme is shared. Present on admin theme lists.
+   */
+  linkedServices: IThemeLinkedService[];
 };
 
 export type IServiceDetail = IService & {
