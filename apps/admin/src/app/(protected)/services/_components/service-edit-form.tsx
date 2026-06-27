@@ -243,33 +243,35 @@ export const ServiceEditForm = forwardRef<
           {...register('description')}
         />
 
-        <ImageUpload
-          ref={coverRef}
-          deferred
-          folder="general"
-          id="coverImage"
-          label="Cover Image"
-          value={watchedCover ?? null}
-          onChange={(media) =>
-            setValue('coverImage', media, { shouldValidate: true })
-          }
-          disabled={disabled}
-          errorMessage={errors.coverImage?.message}
-        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ImageUpload
+            ref={coverRef}
+            deferred
+            folder="general"
+            id="coverImage"
+            label="Cover Image"
+            value={watchedCover ?? null}
+            onChange={(media) =>
+              setValue('coverImage', media, { shouldValidate: true })
+            }
+            disabled={disabled}
+            errorMessage={errors.coverImage?.message}
+          />
 
-        <ImageUpload
-          ref={bannerRef}
-          deferred
-          folder="general"
-          id="bannerImage"
-          label="Banner Image"
-          value={watchedBanner ?? null}
-          onChange={(media) =>
-            setValue('bannerImage', media, { shouldValidate: true })
-          }
-          disabled={disabled}
-          errorMessage={errors.bannerImage?.message}
-        />
+          <ImageUpload
+            ref={bannerRef}
+            deferred
+            folder="general"
+            id="bannerImage"
+            label="Banner Image"
+            value={watchedBanner ?? null}
+            onChange={(media) =>
+              setValue('bannerImage', media, { shouldValidate: true })
+            }
+            disabled={disabled}
+            errorMessage={errors.bannerImage?.message}
+          />
+        </div>
 
         {footer}
       </form>

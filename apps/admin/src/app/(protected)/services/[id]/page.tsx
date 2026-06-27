@@ -1,10 +1,13 @@
 'use client'
 
 import { Badge, Button } from '@pkg/ui'
+import { IconExternalLink } from '@tabler/icons-react'
 
 import { useRouter } from 'next/navigation'
 
 import { use, useRef, useState } from 'react'
+
+import { env } from '@/env'
 
 import { usePermissions } from '@/hooks/use-permissions'
 
@@ -23,6 +26,7 @@ const ServiceDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { can } = usePermissions()
   const [info, setInfo] = useState<{
     name: string
+    slug: string
     deletedAt: string | null
   } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -33,6 +37,11 @@ const ServiceDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const canUpdate = can('services:update')
   const canDelete = can('services:delete')
   const isDeleted = !!info?.deletedAt
+  // Link to the live public service page on the website (a separate app).
+  const websiteUrl =
+    info?.slug && !isDeleted
+      ? `${env.NEXT_PUBLIC_WEBSITE_URL}/services/${info.slug}`
+      : null
 
   return (
     <PermissionGuard permission="services:read" redirectTo="/services">
@@ -50,6 +59,16 @@ const ServiceDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
               <Badge variant="secondary">View only</Badge>
             ) : undefined
           }
+          action={
+            websiteUrl ? (
+              <Button variant="outline" asChild>
+                <a href={websiteUrl} target="_blank" rel="noopener noreferrer">
+                  <IconExternalLink className="size-4" />
+                  View on website
+                </a>
+              </Button>
+            ) : undefined
+          }
         />
 
         <div className="border-border/40 shadow-shadow flex flex-col gap-6 rounded-xl border p-4 shadow-lg sm:p-6">
@@ -57,7 +76,11 @@ const ServiceDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             ref={formRef}
             serviceId={id}
             onLoad={(data) => {
-              setInfo({ name: data.name, deletedAt: data.deletedAt })
+              setInfo({
+                name: data.name,
+                slug: data.slug,
+                deletedAt: data.deletedAt,
+              })
             }}
             onLoadingChange={setLoading}
             onSubmittingChange={setSaving}
