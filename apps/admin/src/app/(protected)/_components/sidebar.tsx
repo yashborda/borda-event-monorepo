@@ -68,6 +68,8 @@ type INavGroup = {
   label: string
   icon: React.ReactNode
   items: INavLeaf[]
+  /** Always expanded and not collapsible (no toggle chevron). */
+  alwaysOpen?: boolean
 }
 
 type INavSection =
@@ -164,6 +166,7 @@ const navSections: INavSection[] = [
       {
         label: 'Event Management',
         icon: <IconCalendarEvent className="size-4 shrink-0" />,
+        alwaysOpen: true,
         items: [
           {
             type: 'link',
@@ -266,11 +269,13 @@ export const Sidebar = () => {
     for (const section of navSections) {
       if (section.type === 'section') {
         for (const group of section.groups) {
-          initial[group.label] = group.items.some((item) =>
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
-          )
+          initial[group.label] =
+            group.alwaysOpen ||
+            group.items.some((item) =>
+              item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href)
+            )
         }
       }
     }
@@ -363,7 +368,8 @@ export const Sidebar = () => {
                   </p>
                 )}
                 {visibleGroups.map((group) => {
-                  const expanded = openGroups[group.label] ?? false
+                  const expanded =
+                    group.alwaysOpen || (openGroups[group.label] ?? false)
                   const groupActive = group.items.some((i) => isActive(i.href))
 
                   if (collapsed) {
@@ -383,9 +389,18 @@ export const Sidebar = () => {
 
                   return (
                     <div key={group.label}>
+                      {/* An always-open group renders a plain, non-clickable
+                          header (no toggle chevron); a normal group toggles. */}
                       <button
-                        onClick={() => toggleGroup(group.label)}
+                        onClick={
+                          group.alwaysOpen
+                            ? undefined
+                            : () => toggleGroup(group.label)
+                        }
+                        aria-disabled={group.alwaysOpen}
                         className={`text-body-md flex w-full items-center gap-3 rounded-md px-3 py-2 transition-colors ${
+                          group.alwaysOpen ? 'cursor-default' : ''
+                        } ${
                           groupActive && !expanded
                             ? 'bg-muted text-foreground font-medium'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -393,9 +408,11 @@ export const Sidebar = () => {
                       >
                         {group.icon}
                         <span className="flex-1 text-left">{group.label}</span>
-                        <IconChevronDown
-                          className={`size-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`}
-                        />
+                        {!group.alwaysOpen && (
+                          <IconChevronDown
+                            className={`size-3.5 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                          />
+                        )}
                       </button>
 
                       {expanded && (
