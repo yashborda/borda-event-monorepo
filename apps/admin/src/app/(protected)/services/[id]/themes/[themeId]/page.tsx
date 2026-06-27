@@ -2,13 +2,16 @@
 
 import type {
   IApiError,
+  IService,
   IServiceDetail,
   IServiceThemeVideo,
   IServiceThemeWithMedia,
+  IThemeLinkedService,
 } from '@pkg/types'
-import { Badge, Button, Input, Skeleton, Textarea, toast } from '@pkg/ui'
+import { Badge, Button, Input, Select, Skeleton, Textarea, toast } from '@pkg/ui'
 import {
   IconBrandInstagram,
+  IconLink,
   IconPencil,
   IconPhotoPlus,
   IconStar,
@@ -136,6 +139,16 @@ const ThemeEditPage = ({ params }: IPageProps) => {
         </div>
 
         <div className="border-border/40 shadow-shadow rounded-xl border p-4 shadow-lg sm:p-6">
+          <ThemeSharingSection
+            currentServiceId={id}
+            themeId={themeId}
+            linkedServices={theme.linkedServices}
+            canEdit={canEdit}
+            onChanged={reload}
+          />
+        </div>
+
+        <div className="border-border/40 shadow-shadow rounded-xl border p-4 shadow-lg sm:p-6">
           <ThemePhotosSection
             serviceId={id}
             themeId={themeId}
@@ -242,6 +255,158 @@ function ThemeInfoForm({
         <div className="flex justify-end">
           <Button type="button" disabled={saving} onClick={handleSave}>
             {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Shared-with-services section ──────────────────────────────
+// Shows every service this (shared) theme belongs to, and lets you add it to
+// another service. The theme's photos/videos are shared — nothing is copied.
+function ThemeSharingSection({
+  currentServiceId,
+  themeId,
+  linkedServices,
+  canEdit,
+  onChanged,
+}: {
+  currentServiceId: string
+  themeId: string
+  linkedServices: IThemeLinkedService[]
+  canEdit: boolean
+  onChanged: () => Promise<void>
+}) {
+  const [services, setServices] = useState<IService[]>([])
+  const [targetId, setTargetId] = useState<string>('')
+  const [adding, setAdding] = useState(false)
+
+  // All active services, to offer as link targets. Fetched once.
+  useEffect(() => {
+    apiFetch<{ data: IService[] }>('/api/admin/services?limit=100')
+      .then((res) => setServices(res.data))
+      .catch((e: IApiError) => handleException(e))
+  }, [])
+
+  // Defensive: older API responses may omit linkedServices.
+  const linked = linkedServices ?? []
+  const linkedIds = new Set(linked.map((s) => s.id))
+  // Candidates: services that DON'T already have this theme (and not deleted).
+  const options = services
+    .filter((s) => !linkedIds.has(s.id) && !s.deletedAt)
+    .map((s) => ({ value: s.id, label: s.name }))
+
+  const addToService = async () => {
+    if (!targetId) return
+    setAdding(true)
+    try {
+      await apiFetch(
+        `/api/admin/services/${targetId}/themes/${themeId}/link`,
+        { method: 'POST' }
+      )
+      toast.success('Theme added to service')
+      setTargetId('')
+      await onChanged()
+    } catch (e) {
+      handleException(e as IApiError)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  // Remove this theme from a service it's shared into (not the current one
+  // unless it's also listed). Uses the same unlink endpoint as the panel.
+  const removeFromService = async (serviceId: string, name: string) => {
+    if (!window.confirm(`Remove this theme from "${name}"?`)) return
+    try {
+      await apiFetch(
+        `/api/admin/services/${serviceId}/themes/${themeId}`,
+        { method: 'DELETE' }
+      )
+      toast.success(`Removed from ${name}`)
+      await onChanged()
+    } catch (e) {
+      handleException(e as IApiError)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-foreground text-lg font-semibold">
+          Shared with services
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          This theme can appear under multiple services. Its photos and videos
+          are shared — nothing is duplicated.
+        </p>
+      </div>
+
+      {/* Current memberships */}
+      <div className="flex flex-wrap gap-2">
+        {linked.length === 0 ? (
+          <span className="text-muted-foreground text-sm">
+            Not linked to any service yet.
+          </span>
+        ) : (
+          linked.map((s) => {
+            const isCurrent = s.id === currentServiceId
+            return (
+              <span
+                key={s.id}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${
+                  isCurrent
+                    ? 'border-primary/50 bg-primary/10 text-foreground'
+                    : 'border-border/60 text-muted-foreground'
+                }`}
+              >
+                {s.name}
+                {isCurrent && (
+                  <span className="text-primary text-xs">(current)</span>
+                )}
+                {canEdit && !isCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => removeFromService(s.id, s.name)}
+                    className="hover:text-destructive transition"
+                    aria-label={`Remove from ${s.name}`}
+                    title={`Remove from ${s.name}`}
+                  >
+                    <IconX className="size-3.5" />
+                  </button>
+                )}
+              </span>
+            )
+          })
+        )}
+      </div>
+
+      {/* Add to another service */}
+      {canEdit && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="sm:w-72">
+            <Select
+              id="add-theme-service"
+              label="Add to another service"
+              placeholder={
+                options.length === 0
+                  ? 'No other services available'
+                  : 'Select a service…'
+              }
+              options={options}
+              value={targetId || undefined}
+              onChange={(v) => setTargetId(v ?? '')}
+              disabled={options.length === 0 || adding}
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={addToService}
+            disabled={!targetId || adding}
+          >
+            <IconLink className="size-4" />
+            {adding ? 'Adding…' : 'Add'}
           </Button>
         </div>
       )}
