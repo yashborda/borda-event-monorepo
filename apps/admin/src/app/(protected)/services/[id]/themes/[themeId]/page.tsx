@@ -6,15 +6,7 @@ import type {
   IServiceThemeVideo,
   IServiceThemeWithMedia,
 } from '@pkg/types'
-import {
-  Badge,
-  Button,
-  Dialog,
-  Input,
-  Skeleton,
-  Textarea,
-  toast,
-} from '@pkg/ui'
+import { Badge, Button, Input, Skeleton, Textarea, toast } from '@pkg/ui'
 import {
   IconBrandInstagram,
   IconPencil,
@@ -34,6 +26,8 @@ import { apiFetch, directBackendUrl, getAccessToken } from '@/lib/api-client'
 import { handleException } from '@/lib/api-helper'
 
 import { usePermissions } from '@/hooks/use-permissions'
+
+import { RenameDialog } from '@/components/rename-dialog'
 
 import { PageHeader } from '../../../../_components/page-header'
 import { PermissionGuard } from '../../../../_components/permission-guard'
@@ -55,84 +49,6 @@ function instagramEmbedUrl(url: string | null | undefined): string | null {
 
 type IPageProps = {
   params: Promise<{ id: string; themeId: string }>
-}
-
-/**
- * Generic rename dialog used by both the photo and video sections. The caller
- * passes a label ("Rename photo" / "Rename video") so the dialog title fits
- * the context. onSave should throw to keep the dialog open on failure.
- */
-function RenameDialog({
-  open,
-  title,
-  description,
-  initialValue,
-  onClose,
-  onSave,
-}: {
-  open: boolean
-  title: string
-  description: string
-  initialValue: string
-  onClose: () => void
-  onSave: (value: string) => Promise<void>
-}) {
-  const [value, setValue] = useState(initialValue)
-  const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    if (open) setValue(initialValue)
-  }, [open, initialValue])
-  const trimmed = value.trim()
-  const submit = async () => {
-    if (!trimmed) return
-    setSaving(true)
-    try {
-      await onSave(trimmed)
-      onClose()
-    } catch (e) {
-      handleException(e as IApiError)
-    } finally {
-      setSaving(false)
-    }
-  }
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => !o && !saving && onClose()}
-      title={title}
-      description={description}
-      actions={[
-        {
-          label: 'Cancel',
-          variant: 'outline-muted',
-          onClick: onClose,
-          disabled: saving,
-          className: 'ml-auto',
-        },
-        {
-          label: saving ? 'Saving…' : 'Save',
-          onClick: submit,
-          disabled: saving || !trimmed,
-        },
-      ]}
-    >
-      <div className="pb-2">
-        <Input
-          id="rename-value"
-          label="New name"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && trimmed && !saving) {
-              e.preventDefault()
-              void submit()
-            }
-          }}
-          autoFocus
-        />
-      </div>
-    </Dialog>
-  )
 }
 
 const ThemeEditPage = ({ params }: IPageProps) => {
