@@ -52,15 +52,17 @@ export class ServiceThemesService {
     const offset = (safePage - 1) * safeLimit;
     const dir = sortDir === 'desc' ? desc : asc;
 
-    // Price nulls always sort last regardless of direction; name uses lower()
-    // for case-insensitive ordering, tie-broken by sortOrder for stability.
+    // Price nulls always sort last regardless of direction.
+    // Name sorts NATURALLY: the non-numeric prefix first (e.g. "baby-theme-"),
+    // then the trailing number as an integer so 2 < 10 < 100 (not lexical
+    // "10","100","11"). Falls back to the full lowered name for names without
+    // a numeric suffix.
+    const namePrefix = sql`lower(regexp_replace(${serviceThemes.name}, '\\d+$', ''))`;
+    const nameNumber = sql`COALESCE(NULLIF((regexp_match(${serviceThemes.name}, '(\\d+)$'))[1], '')::bigint, 0)`;
     const orderBy =
       sortBy === 'price'
         ? [sql`${serviceThemes.price} IS NULL`, dir(serviceThemes.price)]
-        : [
-            dir(sql`lower(${serviceThemes.name})`),
-            asc(serviceThemes.sortOrder),
-          ];
+        : [dir(namePrefix), dir(nameNumber), asc(serviceThemes.sortOrder)];
 
     const [themeRows, [{ total }]] = await Promise.all([
       this.drizzle.db
