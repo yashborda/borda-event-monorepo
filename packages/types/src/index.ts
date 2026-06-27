@@ -75,6 +75,7 @@ export type {
   IServiceTheme,
   IServiceThemeVideo,
   IServiceThemeWithMedia,
+  IThemeLinkedService,
   ICatalogue,
   ICatalogueServiceItem,
   ICatalogueDetail,
