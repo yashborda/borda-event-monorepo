@@ -259,10 +259,18 @@ export const ThemePriceBuckets = ({
                 {showCoverGrid && <ThemeCoverGrid sections={bucket.sections} />}
                 {/* Bottom detail rows only for themes with extra content
                     (more photos or a video). A single-photo theme is already
-                    fully shown by its cover tile + modal preview above. */}
-                {bucket.sections.filter(hasExtraContent).map((section) => (
-                  <ThemeRow key={section.key} section={section} />
-                ))}
+                    fully shown by its cover tile + modal preview above.
+                    Photo-only themes are listed first, then video themes —
+                    a stable sort keeps each group's existing order. */}
+                {bucket.sections
+                  .filter(hasExtraContent)
+                  .sort(
+                    (a, b) =>
+                      Number(a.videos.length > 0) - Number(b.videos.length > 0)
+                  )
+                  .map((section) => (
+                    <ThemeRow key={section.key} section={section} />
+                  ))}
               </div>
             )}
           </div>
