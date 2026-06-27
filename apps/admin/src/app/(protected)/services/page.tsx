@@ -18,6 +18,7 @@ import {
 } from '@pkg/ui'
 import {
   IconDots,
+  IconExternalLink,
   IconEye,
   IconPencil,
   IconPlus,
@@ -28,6 +29,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { useMemo, useState } from 'react'
+
+import { env } from '@/env'
 
 import { appDate } from '@/utils/date.helper'
 
@@ -215,6 +218,23 @@ const ServicesPage = () => {
           className="flex items-center justify-end gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          {!isDeleted && (
+            <Button
+              variant="ghost-muted"
+              size="sm"
+              className="size-8 p-0"
+              asChild
+              title="View on website"
+            >
+              <a
+                href={`${env.NEXT_PUBLIC_WEBSITE_URL}/services/${s.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <IconExternalLink className="size-4" />
+              </a>
+            </Button>
+          )}
           <Button
             variant="ghost-muted"
             size="sm"

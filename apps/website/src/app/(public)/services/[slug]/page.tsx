@@ -119,9 +119,14 @@ type PriceBucket = {
 }
 
 /**
- * Group theme sections into ₹5000 price bands (0–5k, 5–10k, …) by their price,
- * plus a trailing "Other" group for themes with no price set. Empty bands are
- * dropped. Bands are ordered ascending; "Other" always sits last.
+ * Group theme sections into ₹5000 price bands by their price, plus a trailing
+ * "Other" group for themes with no price set. Empty bands are dropped; bands are
+ * ordered ascending with "Other" last.
+ *
+ * Band edges are UPPER-inclusive: a price exactly on a boundary belongs to the
+ * lower band (₹10,000 → the 5k–10k band, not 10k–15k). The first band covers
+ * ₹1–₹5,000; subsequent bands read as ₹5,001–₹10,000, ₹10,001–₹15,000, …, so
+ * the ranges don't overlap.
  */
 const buildPriceBuckets = (sections: ThemeSection[]): PriceBucket[] => {
   const byBand = new Map<number, ThemeSection[]>()
@@ -132,7 +137,9 @@ const buildPriceBuckets = (sections: ThemeSection[]): PriceBucket[] => {
       other.push(s)
       continue
     }
-    const band = Math.floor(s.price / BUCKET_SIZE)
+    // Upper-inclusive: a price on a boundary (10000) maps to the lower band.
+    // ceil()-1 does this; clamp at 0 so ₹0 doesn't fall into a negative band.
+    const band = Math.max(0, Math.ceil(s.price / BUCKET_SIZE) - 1)
     const arr = byBand.get(band) ?? []
     arr.push(s)
     byBand.set(band, arr)
@@ -145,10 +152,12 @@ const buildPriceBuckets = (sections: ThemeSection[]): PriceBucket[] => {
     .map((band) => {
       const min = band * BUCKET_SIZE
       const max = min + BUCKET_SIZE
+      // Lower bound is exclusive in the label so adjacent bands don't overlap:
+      // band 0 → ₹1–₹5,000, band 1 → ₹5,001–₹10,000, etc.
       return {
         key: `band-${band}`,
         min,
-        label: `${inr(min)} – ${inr(max)}`,
+        label: `${inr(min + 1)} – ${inr(max)}`,
         sections: byBand.get(band)!,
       }
     })

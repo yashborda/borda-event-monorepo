@@ -16,6 +16,10 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_ENVIRONMENT: z.enum(['production', 'staging', 'development']),
     NEXT_PUBLIC_SITE_URL: z.string().url(),
+    // Public-facing website base URL (a SEPARATE app from this admin). Used to
+    // build "view on website" links to live service pages. Defaults to the dev
+    // website port so links work out of the box locally.
+    NEXT_PUBLIC_WEBSITE_URL: z.string().url().default('http://localhost:3000'),
     NEXT_PUBLIC_GOOGLE_AUTH_URL: z.string().default('/api/admin/auth/google'),
     // When set (e.g. http://localhost:3002 in dev), large-file uploads (videos)
     // POST directly to the backend instead of going through the Next.js dev
@@ -35,6 +39,7 @@ export const env = createEnv({
   runtimeEnv: {
     NEXT_PUBLIC_ENVIRONMENT: process.env.NEXT_PUBLIC_ENVIRONMENT,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    NEXT_PUBLIC_WEBSITE_URL: process.env.NEXT_PUBLIC_WEBSITE_URL,
     NEXT_PUBLIC_GOOGLE_AUTH_URL: process.env.NEXT_PUBLIC_GOOGLE_AUTH_URL,
     NEXT_PUBLIC_BACKEND_DIRECT_URL: process.env.NEXT_PUBLIC_BACKEND_DIRECT_URL,
   },
