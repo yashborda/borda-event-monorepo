@@ -3,10 +3,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  notInArray,
+  sql,
+} from 'drizzle-orm';
 import { DrizzleService } from '../database/drizzle.service.js';
 import { mediaFiles } from '../database/schema/media-files.table.js';
 import { serviceMedia } from '../database/schema/service-media.table.js';
+import { serviceThemeLinks } from '../database/schema/service-theme-links.table.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { services } from '../database/schema/services.table.js';
@@ -23,12 +34,19 @@ export class ServiceThemesService {
 
   async listAll(serviceId: string) {
     await this.getServiceOrThrow(serviceId);
+    // Themes shown in a service are resolved through the link table, so a theme
+    // shared into this service appears here too. Order by the per-service link
+    // sortOrder (not the theme's own legacy column).
     const rows = await this.drizzle.db
-      .select()
-      .from(serviceThemes)
-      .where(eq(serviceThemes.serviceId, serviceId))
-      .orderBy(asc(serviceThemes.sortOrder), asc(serviceThemes.createdAt));
-    return rows.map((t) => this.serialize(t));
+      .select({ theme: serviceThemes, linkSort: serviceThemeLinks.sortOrder })
+      .from(serviceThemeLinks)
+      .innerJoin(
+        serviceThemes,
+        eq(serviceThemes.id, serviceThemeLinks.themeId),
+      )
+      .where(eq(serviceThemeLinks.serviceId, serviceId))
+      .orderBy(asc(serviceThemeLinks.sortOrder), asc(serviceThemes.createdAt));
+    return rows.map((r) => this.serialize(r.theme, r.linkSort));
   }
 
   /**
@@ -62,32 +80,44 @@ export class ServiceThemesService {
     const orderBy =
       sortBy === 'price'
         ? [sql`${serviceThemes.price} IS NULL`, dir(serviceThemes.price)]
-        : [dir(namePrefix), dir(nameNumber), asc(serviceThemes.sortOrder)];
+        : [dir(namePrefix), dir(nameNumber), asc(serviceThemeLinks.sortOrder)];
 
-    const [themeRows, [{ total }]] = await Promise.all([
+    // Page over the themes LINKED to this service (so shared themes are
+    // included), joining the theme row in for sorting/media.
+    const [rows, [{ total }]] = await Promise.all([
       this.drizzle.db
-        .select()
-        .from(serviceThemes)
-        .where(eq(serviceThemes.serviceId, serviceId))
+        .select({ theme: serviceThemes, linkSort: serviceThemeLinks.sortOrder })
+        .from(serviceThemeLinks)
+        .innerJoin(
+          serviceThemes,
+          eq(serviceThemes.id, serviceThemeLinks.themeId),
+        )
+        .where(eq(serviceThemeLinks.serviceId, serviceId))
         .orderBy(...orderBy)
         .limit(safeLimit)
         .offset(offset),
       this.drizzle.db
         .select({ total: count() })
-        .from(serviceThemes)
-        .where(eq(serviceThemes.serviceId, serviceId)),
+        .from(serviceThemeLinks)
+        .where(eq(serviceThemeLinks.serviceId, serviceId)),
     ]);
 
-    const data = await this.attachMedia(themeRows);
+    const data = await this.attachMedia(
+      rows.map((r) => r.theme),
+      new Map(rows.map((r) => [r.theme.id, r.linkSort])),
+    );
     return { data, total, page: safePage, limit: safeLimit };
   }
 
   /** Group each page-theme's media + videos onto it (page-scoped, not service-wide). */
-  private async attachMedia(themeRows: (typeof serviceThemes.$inferSelect)[]) {
+  private async attachMedia(
+    themeRows: (typeof serviceThemes.$inferSelect)[],
+    linkSortByTheme?: Map<string, number>,
+  ) {
     if (themeRows.length === 0) return [];
     const themeIds = themeRows.map((t) => t.id);
 
-    const [mediaRows, videoRows] = await Promise.all([
+    const [mediaRows, videoRows, linkRows] = await Promise.all([
       this.drizzle.db
         .select({
           themeId: serviceMedia.themeId,
@@ -119,7 +149,26 @@ export class ServiceThemesService {
         .from(serviceVideos)
         .where(inArray(serviceVideos.themeId, themeIds))
         .orderBy(asc(serviceVideos.sortOrder)),
+      // Every service each page-theme is linked to — drives the "Also in" badge.
+      this.drizzle.db
+        .select({
+          themeId: serviceThemeLinks.themeId,
+          id: services.id,
+          name: services.name,
+          slug: services.slug,
+        })
+        .from(serviceThemeLinks)
+        .innerJoin(services, eq(services.id, serviceThemeLinks.serviceId))
+        .where(inArray(serviceThemeLinks.themeId, themeIds))
+        .orderBy(asc(services.name)),
     ]);
+
+    const servicesByTheme = new Map<string, typeof linkRows>();
+    for (const l of linkRows) {
+      const arr = servicesByTheme.get(l.themeId) ?? [];
+      arr.push(l);
+      servicesByTheme.set(l.themeId, arr);
+    }
 
     const mediaByTheme = new Map<string, typeof mediaRows>();
     for (const m of mediaRows) {
@@ -137,7 +186,12 @@ export class ServiceThemesService {
     }
 
     return themeRows.map((t) => ({
-      ...this.serialize(t),
+      ...this.serialize(t, linkSortByTheme?.get(t.id)),
+      linkedServices: (servicesByTheme.get(t.id) ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        slug: s.slug,
+      })),
       media: (mediaByTheme.get(t.id) ?? []).map((m) => ({
         id: m.id,
         url: m.url,
@@ -170,30 +224,43 @@ export class ServiceThemesService {
 
     const name = await this.nextThemeName(serviceId, service.slug);
 
+    // Next position within THIS service comes from the link table.
     const [{ maxOrder }] = await this.drizzle.db
       .select({
-        maxOrder: sql<number>`COALESCE(MAX(${serviceThemes.sortOrder}), -1)::int`,
+        maxOrder: sql<number>`COALESCE(MAX(${serviceThemeLinks.sortOrder}), -1)::int`,
       })
-      .from(serviceThemes)
-      .where(eq(serviceThemes.serviceId, serviceId));
+      .from(serviceThemeLinks)
+      .where(eq(serviceThemeLinks.serviceId, serviceId));
 
-    const [inserted] = await this.drizzle.db
-      .insert(serviceThemes)
-      .values({
+    const sortOrder = dto.sortOrder ?? maxOrder + 1;
+
+    // Create the theme and link it to this service atomically. The legacy
+    // serviceId/sortOrder on the theme row are kept in sync for back-compat.
+    const inserted = await this.drizzle.db.transaction(async (tx) => {
+      const [theme] = await tx
+        .insert(serviceThemes)
+        .values({
+          serviceId,
+          name,
+          description: dto.description,
+          price: dto.price,
+          sortOrder,
+          createdBy: createdById,
+        })
+        .returning();
+      await tx.insert(serviceThemeLinks).values({
         serviceId,
-        name,
-        description: dto.description,
-        price: dto.price,
-        sortOrder: dto.sortOrder ?? maxOrder + 1,
-        createdBy: createdById,
-      })
-      .returning();
+        themeId: theme.id,
+        sortOrder,
+      });
+      return theme;
+    });
 
     this.revalidationService.revalidate([
       'services',
       `service-${service.slug}`,
     ]);
-    return this.serialize(inserted);
+    return this.serialize(inserted, sortOrder);
   }
 
   async update(serviceId: string, themeId: string, dto: UpdateServiceThemeDto) {
@@ -223,23 +290,147 @@ export class ServiceThemesService {
     return this.serialize(updated);
   }
 
+  /**
+   * Remove a theme FROM this service. Because themes are shared, this unlinks
+   * the theme from the service; only when it was the theme's LAST remaining
+   * service do we hard-delete the theme itself (and, via ON DELETE cascade, its
+   * media/video junction rows). The R2 objects are untouched — they're cleaned
+   * up by the per-media/video delete endpoints.
+   */
   async remove(serviceId: string, themeId: string) {
     const service = await this.getServiceOrThrow(serviceId);
     await this.getThemeOrThrow(serviceId, themeId);
 
-    // ON DELETE cascade on service_media.theme_id + service_videos.theme_id
-    // unlinks attached media/videos automatically (sets row to deleted because
-    // the FK is also CASCADE). Drive files themselves stay — they're cleaned up
-    // by the per-media / per-video delete endpoints, not theme removal.
-    await this.drizzle.db
-      .delete(serviceThemes)
-      .where(eq(serviceThemes.id, themeId));
+    await this.unlinkAndMaybeDelete(serviceId, [themeId]);
 
     this.revalidationService.revalidate([
       'services',
       `service-${service.slug}`,
     ]);
-    return { message: 'Theme deleted' };
+    return { message: 'Theme removed from service' };
+  }
+
+  /**
+   * Link an EXISTING theme (from another service) into this service, so the
+   * same theme — with its shared photos/videos — appears here too. No media is
+   * copied. Rejects if the theme is already linked here.
+   */
+  async linkExisting(serviceId: string, themeId: string) {
+    const service = await this.getServiceOrThrow(serviceId);
+
+    const [theme] = await this.drizzle.db
+      .select({ id: serviceThemes.id })
+      .from(serviceThemes)
+      .where(eq(serviceThemes.id, themeId))
+      .limit(1);
+    if (!theme) throw new NotFoundException('Theme not found');
+
+    const [existing] = await this.drizzle.db
+      .select({ themeId: serviceThemeLinks.themeId })
+      .from(serviceThemeLinks)
+      .where(
+        and(
+          eq(serviceThemeLinks.serviceId, serviceId),
+          eq(serviceThemeLinks.themeId, themeId),
+        ),
+      )
+      .limit(1);
+    if (existing)
+      throw new BadRequestException(
+        'Theme is already added to this service',
+      );
+
+    const [{ maxOrder }] = await this.drizzle.db
+      .select({
+        maxOrder: sql<number>`COALESCE(MAX(${serviceThemeLinks.sortOrder}), -1)::int`,
+      })
+      .from(serviceThemeLinks)
+      .where(eq(serviceThemeLinks.serviceId, serviceId));
+
+    await this.drizzle.db
+      .insert(serviceThemeLinks)
+      .values({ serviceId, themeId, sortOrder: maxOrder + 1 });
+
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
+    return { message: 'Theme added to service' };
+  }
+
+  /**
+   * Themes that exist (in any OTHER service) but are NOT yet linked to this
+   * service — the candidate list for an "add existing theme" picker. Optional
+   * case-insensitive name search. Capped to keep the payload small.
+   */
+  async listAvailable(serviceId: string, search?: string, limit = 50) {
+    await this.getServiceOrThrow(serviceId);
+    const safeLimit = Math.min(100, Math.max(1, limit));
+
+    const linkedHere = this.drizzle.db
+      .select({ themeId: serviceThemeLinks.themeId })
+      .from(serviceThemeLinks)
+      .where(eq(serviceThemeLinks.serviceId, serviceId));
+
+    const where = search
+      ? and(
+          notInArray(serviceThemes.id, linkedHere),
+          ilike(serviceThemes.name, `%${search}%`),
+        )
+      : notInArray(serviceThemes.id, linkedHere);
+
+    const rows = await this.drizzle.db
+      .select()
+      .from(serviceThemes)
+      .where(where)
+      .orderBy(asc(serviceThemes.name))
+      .limit(safeLimit);
+
+    const themes = await this.attachMedia(rows);
+    return themes;
+  }
+
+  /** Which services a theme is currently linked to — for an "Also in …" badge. */
+  async listServicesForTheme(themeId: string) {
+    const rows = await this.drizzle.db
+      .select({ id: services.id, name: services.name, slug: services.slug })
+      .from(serviceThemeLinks)
+      .innerJoin(services, eq(services.id, serviceThemeLinks.serviceId))
+      .where(eq(serviceThemeLinks.themeId, themeId))
+      .orderBy(asc(services.name));
+    return rows;
+  }
+
+  /**
+   * Unlink the given themes from a service, then hard-delete any of them that no
+   * longer belong to ANY service. Runs in a single transaction.
+   */
+  private async unlinkAndMaybeDelete(serviceId: string, themeIds: string[]) {
+    if (themeIds.length === 0) return;
+    await this.drizzle.db.transaction(async (tx) => {
+      await tx
+        .delete(serviceThemeLinks)
+        .where(
+          and(
+            eq(serviceThemeLinks.serviceId, serviceId),
+            inArray(serviceThemeLinks.themeId, themeIds),
+          ),
+        );
+
+      // Of the just-unlinked themes, find which are now orphaned (no links left)
+      // and delete them outright.
+      const stillLinked = await tx
+        .select({ themeId: serviceThemeLinks.themeId })
+        .from(serviceThemeLinks)
+        .where(inArray(serviceThemeLinks.themeId, themeIds));
+      const linkedSet = new Set(stillLinked.map((r) => r.themeId));
+      const orphaned = themeIds.filter((id) => !linkedSet.has(id));
+      if (orphaned.length > 0) {
+        await tx
+          .delete(serviceThemes)
+          .where(inArray(serviceThemes.id, orphaned));
+      }
+    });
   }
 
   /**
@@ -252,12 +443,12 @@ export class ServiceThemesService {
 
     const ids = Array.from(new Set(themeIds));
     const owned = await this.drizzle.db
-      .select({ id: serviceThemes.id })
-      .from(serviceThemes)
+      .select({ id: serviceThemeLinks.themeId })
+      .from(serviceThemeLinks)
       .where(
         and(
-          eq(serviceThemes.serviceId, serviceId),
-          inArray(serviceThemes.id, ids),
+          eq(serviceThemeLinks.serviceId, serviceId),
+          inArray(serviceThemeLinks.themeId, ids),
         ),
       );
 
@@ -266,29 +457,22 @@ export class ServiceThemesService {
         'One or more themes do not belong to this service',
       );
 
-    await this.drizzle.db
-      .delete(serviceThemes)
-      .where(
-        and(
-          eq(serviceThemes.serviceId, serviceId),
-          inArray(serviceThemes.id, ids),
-        ),
-      );
+    await this.unlinkAndMaybeDelete(serviceId, ids);
 
     this.revalidationService.revalidate([
       'services',
       `service-${service.slug}`,
     ]);
-    return { message: `${ids.length} theme(s) deleted`, count: ids.length };
+    return { message: `${ids.length} theme(s) removed`, count: ids.length };
   }
 
   async reorder(serviceId: string, themeIds: string[]) {
     const service = await this.getServiceOrThrow(serviceId);
 
     const owned = await this.drizzle.db
-      .select({ id: serviceThemes.id })
-      .from(serviceThemes)
-      .where(eq(serviceThemes.serviceId, serviceId));
+      .select({ id: serviceThemeLinks.themeId })
+      .from(serviceThemeLinks)
+      .where(eq(serviceThemeLinks.serviceId, serviceId));
     const ownedIds = new Set(owned.map((o) => o.id));
 
     for (const id of themeIds) {
@@ -298,12 +482,19 @@ export class ServiceThemesService {
         );
     }
 
+    // Reorder is per-service: only this service's link rows are renumbered, so
+    // a shared theme's position in OTHER services is unaffected.
     await this.drizzle.db.transaction(async (tx) => {
       for (let i = 0; i < themeIds.length; i++) {
         await tx
-          .update(serviceThemes)
+          .update(serviceThemeLinks)
           .set({ sortOrder: i })
-          .where(eq(serviceThemes.id, themeIds[i]));
+          .where(
+            and(
+              eq(serviceThemeLinks.serviceId, serviceId),
+              eq(serviceThemeLinks.themeId, themeIds[i]),
+            ),
+          );
       }
     });
 
@@ -403,18 +594,40 @@ export class ServiceThemesService {
       });
     }
 
-    await executor.insert(serviceThemes).values(values);
+    const inserted = await executor
+      .insert(serviceThemes)
+      .values(values)
+      .returning({ id: serviceThemes.id, sortOrder: serviceThemes.sortOrder });
+
+    // Link each placeholder theme to the service so it surfaces in the
+    // link-table-driven theme lists.
+    await executor.insert(serviceThemeLinks).values(
+      inserted.map((t) => ({
+        serviceId,
+        themeId: t.id,
+        sortOrder: t.sortOrder,
+      })),
+    );
     return values.length;
   }
 
-  private serialize(t: typeof serviceThemes.$inferSelect) {
+  /**
+   * `linkSortOrder`, when provided, is the per-service ordering from
+   * service_theme_links and takes precedence over the theme's own legacy
+   * sortOrder column — so a shared theme can sit in a different position in
+   * each service it belongs to.
+   */
+  private serialize(
+    t: typeof serviceThemes.$inferSelect,
+    linkSortOrder?: number,
+  ) {
     return {
       id: t.id,
       serviceId: t.serviceId,
       name: t.name,
       description: t.description,
       price: t.price,
-      sortOrder: t.sortOrder,
+      sortOrder: linkSortOrder ?? t.sortOrder,
       createdBy: t.createdBy,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
@@ -440,18 +653,23 @@ export class ServiceThemesService {
     return service;
   }
 
+  /** A theme belongs to a service when a link row joins them. */
   private async getThemeOrThrow(serviceId: string, themeId: string) {
-    const [theme] = await this.drizzle.db
-      .select()
-      .from(serviceThemes)
+    const [row] = await this.drizzle.db
+      .select({ theme: serviceThemes })
+      .from(serviceThemeLinks)
+      .innerJoin(
+        serviceThemes,
+        eq(serviceThemes.id, serviceThemeLinks.themeId),
+      )
       .where(
         and(
-          eq(serviceThemes.id, themeId),
-          eq(serviceThemes.serviceId, serviceId),
+          eq(serviceThemeLinks.themeId, themeId),
+          eq(serviceThemeLinks.serviceId, serviceId),
         ),
       )
       .limit(1);
-    if (!theme) throw new NotFoundException('Theme not found');
-    return theme;
+    if (!row) throw new NotFoundException('Theme not found');
+    return row.theme;
   }
 }

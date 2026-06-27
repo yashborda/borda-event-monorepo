@@ -11,6 +11,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   ne,
@@ -21,6 +22,7 @@ import { DrizzleService } from '../database/drizzle.service.js';
 import { adminUsers } from '../database/schema/admin-users.table.js';
 import { mediaFiles } from '../database/schema/media-files.table.js';
 import { serviceMedia } from '../database/schema/service-media.table.js';
+import { serviceThemeLinks } from '../database/schema/service-theme-links.table.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
 import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { services } from '../database/schema/services.table.js';
@@ -581,13 +583,19 @@ export class ServicesService {
     serviceId: string,
     themeId: string,
   ) {
+    // Membership is via the link table now (themes are shared), so a theme
+    // linked into this service passes even if it originated elsewhere.
     const [t] = await this.drizzle.db
       .select({ id: serviceThemes.id, name: serviceThemes.name })
-      .from(serviceThemes)
+      .from(serviceThemeLinks)
+      .innerJoin(
+        serviceThemes,
+        eq(serviceThemes.id, serviceThemeLinks.themeId),
+      )
       .where(
         and(
-          eq(serviceThemes.id, themeId),
-          eq(serviceThemes.serviceId, serviceId),
+          eq(serviceThemeLinks.themeId, themeId),
+          eq(serviceThemeLinks.serviceId, serviceId),
         ),
       )
       .limit(1);
@@ -660,6 +668,10 @@ export class ServicesService {
   async detachMedia(id: string, mediaId: string) {
     const service = await this.getServiceOrThrow(id);
 
+    // Look the media up by its id alone. A theme-attached photo may have been
+    // uploaded from another service (themes are shared), so its junction row's
+    // serviceId can differ from the one we're viewing from — keying on
+    // serviceId would wrongly 404 it.
     const [attached] = await this.drizzle.db
       .select({
         mediaId: serviceMedia.mediaId,
@@ -667,9 +679,7 @@ export class ServicesService {
         isFeatured: serviceMedia.isFeatured,
       })
       .from(serviceMedia)
-      .where(
-        and(eq(serviceMedia.serviceId, id), eq(serviceMedia.mediaId, mediaId)),
-      )
+      .where(eq(serviceMedia.mediaId, mediaId))
       .limit(1);
 
     if (!attached)
@@ -695,7 +705,7 @@ export class ServicesService {
           .set({ isFeatured: true })
           .where(
             and(
-              eq(serviceMedia.serviceId, id),
+              eq(serviceMedia.themeId, attached.themeId),
               eq(serviceMedia.mediaId, next.mediaId),
             ),
           );
@@ -761,6 +771,12 @@ export class ServicesService {
     return service;
   }
 
+  /**
+   * Top-level (service-level) media only — rows with NO theme. Theme-attached
+   * media now comes through `fetchServiceThemes` (keyed by themeId so shared
+   * themes carry their media everywhere), so including it here too would
+   * double-list it.
+   */
   private async fetchServiceMedia(serviceId: string) {
     const rows = await this.drizzle.db
       .select({
@@ -776,7 +792,12 @@ export class ServicesService {
       })
       .from(serviceMedia)
       .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
-      .where(eq(serviceMedia.serviceId, serviceId))
+      .where(
+        and(
+          eq(serviceMedia.serviceId, serviceId),
+          isNull(serviceMedia.themeId),
+        ),
+      )
       .orderBy(asc(serviceMedia.sortOrder));
 
     return rows.map((m) => ({
@@ -799,14 +820,28 @@ export class ServicesService {
    * videos stay on the top-level `media` array returned by `findOne`.
    */
   private async fetchServiceThemes(serviceId: string) {
-    const themeRows = await this.drizzle.db
-      .select()
-      .from(serviceThemes)
-      .where(eq(serviceThemes.serviceId, serviceId))
-      .orderBy(asc(serviceThemes.sortOrder), asc(serviceThemes.createdAt));
+    // Themes are resolved through the link table so a theme shared into this
+    // service is included; ordering is the per-service link sortOrder.
+    const themeRowsRaw = await this.drizzle.db
+      .select({ theme: serviceThemes, linkSort: serviceThemeLinks.sortOrder })
+      .from(serviceThemeLinks)
+      .innerJoin(
+        serviceThemes,
+        eq(serviceThemes.id, serviceThemeLinks.themeId),
+      )
+      .where(eq(serviceThemeLinks.serviceId, serviceId))
+      .orderBy(asc(serviceThemeLinks.sortOrder), asc(serviceThemes.createdAt));
 
-    if (themeRows.length === 0) return [];
+    if (themeRowsRaw.length === 0) return [];
 
+    const themeRows = themeRowsRaw.map((r) => r.theme);
+    const linkSortByTheme = new Map(
+      themeRowsRaw.map((r) => [r.theme.id, r.linkSort]),
+    );
+    const themeIds = themeRows.map((t) => t.id);
+
+    // Media/videos are fetched BY themeId (not serviceId), so a shared theme's
+    // photos/videos surface in every service it's linked to.
     const [mediaRows, videoRows] = await Promise.all([
       this.drizzle.db
         .select({
@@ -822,7 +857,7 @@ export class ServicesService {
         })
         .from(serviceMedia)
         .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
-        .where(eq(serviceMedia.serviceId, serviceId))
+        .where(inArray(serviceMedia.themeId, themeIds))
         .orderBy(asc(serviceMedia.sortOrder)),
       this.drizzle.db
         .select({
@@ -837,7 +872,7 @@ export class ServicesService {
           sortOrder: serviceVideos.sortOrder,
         })
         .from(serviceVideos)
-        .where(eq(serviceVideos.serviceId, serviceId))
+        .where(inArray(serviceVideos.themeId, themeIds))
         .orderBy(asc(serviceVideos.sortOrder)),
     ]);
 
@@ -863,7 +898,7 @@ export class ServicesService {
       name: t.name,
       description: t.description,
       price: t.price,
-      sortOrder: t.sortOrder,
+      sortOrder: linkSortByTheme.get(t.id) ?? t.sortOrder,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
       media: (mediaByTheme.get(t.id) ?? []).map((m) => ({
