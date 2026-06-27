@@ -4,6 +4,8 @@ import {
   Controller,
   Delete,
   HttpCode,
+  Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -14,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { UploadService } from './upload.service.js';
 import { R2Service } from './r2.service.js';
+import { RenameMediaDto } from './dto/rename-media.dto.js';
 
 @Controller('admin/upload')
 @UseGuards(AuthGuard('admin-jwt'))
@@ -59,5 +62,15 @@ export class UploadController {
   async deleteDriveImage(@Query('id') id: string) {
     if (!id) throw new BadRequestException('id (media file id) is required');
     await this.r2Service.deleteFile(id);
+  }
+
+  // Rename a media file's display name by media id. Updates the DB
+  // originalName only — R2 object keys (and their URLs) are immutable.
+  @Patch('drive-image/:mediaId/name')
+  async renameDriveImage(
+    @Param('mediaId') mediaId: string,
+    @Body() dto: RenameMediaDto,
+  ) {
+    return this.r2Service.renameMediaFile(mediaId, dto.name);
   }
 }

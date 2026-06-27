@@ -1,8 +1,8 @@
 'use client'
 
 import type { IMediaFile } from '@pkg/types'
-import { FileUpload, Label } from '@pkg/ui'
-import { IconX } from '@tabler/icons-react'
+import { FileUpload, Label, toast } from '@pkg/ui'
+import { IconPencil, IconX } from '@tabler/icons-react'
 
 import Image from 'next/image'
 
@@ -14,9 +14,13 @@ import {
   useState,
 } from 'react'
 
+import { apiFetch } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 
 import { useUpload } from '@/hooks/use-upload'
+
+import { ImagePreviewDialog } from './image-preview-dialog'
+import { RenameDialog } from './rename-dialog'
 
 export type ImageUploadHandle = {
   /** IconUpload the pending file (if any) and return the IMediaFile.
@@ -57,6 +61,8 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
     const { upload, uploading } = useUpload()
     const [pendingFile, setPendingFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [previewOpen, setPreviewOpen] = useState(false)
+    const [renameOpen, setRenameOpen] = useState(false)
     const prevPreviewUrl = useRef<string | null>(null)
 
     // Revoke previous blob URL when it changes to avoid memory leaks
@@ -69,7 +75,6 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
       return () => {
         if (previewUrl) URL.revokeObjectURL(previewUrl)
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [previewUrl])
 
     useImperativeHandle(ref, () => ({
@@ -123,6 +128,21 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
       'image'
     const displaySize = pendingFile?.size ?? value?.size ?? null
 
+    // Rename only works on an image already persisted on the server: it has a
+    // real media id and no pending (unsaved) file. Deferred picks carry an
+    // empty id until the form is saved, so the button stays hidden until then.
+    const savedMediaId = !pendingFile && value?.id ? value.id : null
+
+    const handleRename = async (name: string) => {
+      if (!savedMediaId) return
+      await apiFetch(`/api/admin/upload/drive-image/${savedMediaId}/name`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      })
+      onChange({ ...value!, originalName: name })
+      toast.success('Image renamed')
+    }
+
     const formatSize = (bytes: number) => {
       if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
       return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -138,7 +158,12 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
               disabled && 'bg-muted cursor-not-allowed'
             )}
           >
-            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="focus-visible:ring-ring relative h-16 w-16 shrink-0 cursor-zoom-in overflow-hidden rounded focus:outline-none focus-visible:ring-2"
+              aria-label="Preview image"
+            >
               <Image
                 src={displayUrl}
                 alt={displayName}
@@ -146,7 +171,7 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
                 className="object-cover"
                 unoptimized
               />
-            </div>
+            </button>
             <div className="min-w-0 flex-1">
               <p className="text-body-sm text-foreground truncate font-medium">
                 {displayName}
@@ -157,16 +182,44 @@ export const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
                 </p>
               )}
             </div>
+            {!disabled && savedMediaId && (
+              <button
+                type="button"
+                onClick={() => setRenameOpen(true)}
+                className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                aria-label="Rename image"
+                title="Rename image"
+              >
+                <IconPencil className="size-4" />
+              </button>
+            )}
             {!disabled && (
               <button
                 type="button"
                 onClick={handleRemove}
                 className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+                aria-label="Remove image"
               >
                 <IconX className="size-4" />
               </button>
             )}
           </div>
+          <ImagePreviewDialog
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+            url={displayUrl}
+            title={displayName}
+          />
+          {savedMediaId && (
+            <RenameDialog
+              open={renameOpen}
+              title="Rename image"
+              description="Updates the display name shown in the admin."
+              initialValue={value?.originalName ?? displayName}
+              onClose={() => setRenameOpen(false)}
+              onSave={handleRename}
+            />
+          )}
         </div>
       )
     }

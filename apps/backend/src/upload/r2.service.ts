@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -140,7 +141,10 @@ export class R2Service {
       return true;
     } catch (err: unknown) {
       // 404 / NotFound → free. Anything else is a real error worth surfacing.
-      const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      const e = err as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
       if (e?.name === 'NotFound' || e?.$metadata?.httpStatusCode === 404)
         return false;
       throw err;
@@ -271,6 +275,33 @@ export class R2Service {
     await this.drizzle.db
       .delete(mediaFiles)
       .where(eq(mediaFiles.id, mediaFileId));
+  }
+
+  /**
+   * Rename a media file's display name by its media_files id. R2 object keys
+   * are immutable (see renameFile), so this only updates the DB originalName.
+   * Returns the updated { id, originalName }; throws if the id is unknown.
+   */
+  async renameMediaFile(
+    mediaFileId: string,
+    newName: string,
+  ): Promise<{ id: string; originalName: string }> {
+    const trimmed = newName.trim();
+    if (!trimmed) throw new BadRequestException('Name cannot be empty');
+
+    const [record] = await this.drizzle.db
+      .select({ id: mediaFiles.id })
+      .from(mediaFiles)
+      .where(eq(mediaFiles.id, mediaFileId))
+      .limit(1);
+    if (!record) throw new NotFoundException('Media file not found');
+
+    await this.drizzle.db
+      .update(mediaFiles)
+      .set({ originalName: trimmed })
+      .where(eq(mediaFiles.id, mediaFileId));
+
+    return { id: mediaFileId, originalName: trimmed };
   }
 
   /**

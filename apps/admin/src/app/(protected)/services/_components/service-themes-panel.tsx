@@ -1,9 +1,20 @@
 'use client'
 
 import type { IApiError, IServiceThemeWithMedia } from '@pkg/types'
-import { Button, Checkbox, Dialog, Input, Skeleton, toast } from '@pkg/ui'
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  Input,
+  Select,
+  Skeleton,
+  cn,
+  toast,
+} from '@pkg/ui'
 import {
   IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconChevronUp,
   IconLoader2,
   IconPencil,
@@ -15,15 +26,32 @@ import {
   IconVideo,
 } from '@tabler/icons-react'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { apiFetch, directBackendUrl, getAccessToken } from '@/lib/api-client'
 import { handleException } from '@/lib/api-helper'
 
 import { usePermissions } from '@/hooks/use-permissions'
+
+import { ImagePreviewDialog } from '@/components/image-preview-dialog'
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10' },
+  { value: '20', label: '20' },
+  { value: '50', label: '50' },
+  { value: '100', label: '100' },
+]
+
+/** The image to show as a theme's thumbnail: featured first, else the first. */
+const themeCover = (theme: IServiceThemeWithMedia): string | null => {
+  if (theme.media.length === 0) return null
+  const featured = theme.media.find((m) => m.isFeatured)
+  return (featured ?? theme.media[0])?.url ?? null
+}
 
 interface IPanelProps {
   serviceId: string
@@ -44,15 +72,18 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
   const { can } = usePermissions()
   const canEdit = can('services:update') && !disabled
 
+  // Current page of themes (with media) + total count, both from the backend.
   const [themes, setThemes] = useState<IServiceThemeWithMedia[]>([])
-  const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true) // first load only (skeleton)
+  const [paging, setPaging] = useState(false) // page/sort change (dim rows)
   const [adding, setAdding] = useState(false)
 
   // Inline price editing: themeId → draft string while focused.
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [savingPrice, setSavingPrice] = useState<Set<string>>(new Set())
 
-  // Sorting + multi-select.
+  // Server-side sorting + multi-select (selection is per-page).
   const [sort, setSort] = useState<{ key: ISortKey; dir: ISortDir }>({
     key: 'name',
     dir: 'asc',
@@ -63,56 +94,83 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<IDeleteTarget>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Image preview lightbox: the thumbnail url currently being previewed.
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(
+    null
+  )
+
   // Drag-and-drop upload: which row is being hovered, and which rows are
   // currently uploading.
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
 
-  const reload = async () => {
-    try {
-      const data = await apiFetch<{ themes: IServiceThemeWithMedia[] }>(
-        `/api/admin/services/${serviceId}`
-      )
-      setThemes(data.themes ?? [])
-    } catch (e) {
-      handleException(e as IApiError)
-    }
+  // Server-side pagination so a service with hundreds of themes stays snappy.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  type IThemesPage = {
+    data: IServiceThemeWithMedia[]
+    total: number
+    page: number
+    limit: number
   }
 
-  useEffect(() => {
-    apiFetch<{ themes: IServiceThemeWithMedia[] }>(
-      `/api/admin/services/${serviceId}`
-    )
-      .then((data) => setThemes(data.themes ?? []))
-      .catch((e: IApiError) => handleException(e))
-      .finally(() => setLoading(false))
-  }, [serviceId])
-
-  const sortedThemes = useMemo(() => {
-    const rows = [...themes]
-    rows.sort((a, b) => {
-      let cmp: number
-      if (sort.key === 'price') {
-        // Nulls sort last regardless of direction.
-        const ap = a.price ?? Number.POSITIVE_INFINITY
-        const bp = b.price ?? Number.POSITIVE_INFINITY
-        cmp = ap - bp
-      } else {
-        cmp = a.name.localeCompare(b.name, undefined, { numeric: true })
+  // Fetch one page of themes. `silent` keeps the old rows visible (dim) instead
+  // of flashing a skeleton — used for page/sort/refresh, not the first load.
+  const fetchPage = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (opts?.silent) setPaging(true)
+      try {
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(pageSize),
+          sortBy: sort.key,
+          sortDir: sort.dir,
+        })
+        const res = await apiFetch<IThemesPage>(
+          `/api/admin/services/${serviceId}/themes?${params.toString()}`
+        )
+        setThemes(res.data)
+        setTotal(res.total)
+      } catch (e) {
+        handleException(e as IApiError)
+      } finally {
+        setLoading(false)
+        setPaging(false)
       }
-      return sort.dir === 'asc' ? cmp : -cmp
-    })
-    return rows
-  }, [themes, sort])
+    },
+    [serviceId, page, pageSize, sort.key, sort.dir]
+  )
 
-  const toggleSort = (key: ISortKey) =>
+  useEffect(() => {
+    void fetchPage({ silent: !loading })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchPage])
+
+  // Refetch the current page after a mutation (upload/delete/price).
+  const reload = () => fetchPage({ silent: true })
+
+  // Clamp to the last page when deletes shrink the total below the cursor.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  const pagedThemes = themes
+
+  const toggleSort = (key: ISortKey) => {
+    setPage(1)
     setSort((s) =>
       s.key === key
         ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
         : { key, dir: 'asc' }
     )
+  }
 
-  const allSelected = themes.length > 0 && selected.size === themes.length
+  // Selection is scoped to the visible page.
+  const allSelected =
+    themes.length > 0 && themes.every((t) => selected.has(t.id))
   const someSelected = selected.size > 0 && !allSelected
 
   const toggleSelectAll = () =>
@@ -363,223 +421,326 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
           </p>
         </div>
       ) : (
-        <div className="border-border/40 max-h-150 overflow-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-muted-foreground sticky top-0 z-10">
-              <tr>
-                {canEdit && (
-                  <th className="w-10 px-4 py-2">
-                    <Checkbox
-                      checked={
-                        allSelected
-                          ? true
-                          : someSelected
-                            ? 'indeterminate'
-                            : false
-                      }
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all themes"
-                    />
+        <div className="border-border/40 overflow-hidden rounded-lg border">
+          <div className="relative max-h-150 overflow-auto">
+            {paging && (
+              <div className="bg-background/40 absolute inset-0 z-20 flex items-start justify-center pt-6">
+                <IconLoader2 className="text-muted-foreground size-6 animate-spin" />
+              </div>
+            )}
+            <table
+              className={cn(
+                'w-full text-sm transition-opacity',
+                paging && 'pointer-events-none opacity-50'
+              )}
+            >
+              <thead className="bg-muted text-muted-foreground sticky top-0 z-10">
+                <tr>
+                  {canEdit && (
+                    <th className="w-10 px-4 py-2">
+                      <Checkbox
+                        checked={
+                          allSelected
+                            ? true
+                            : someSelected
+                              ? 'indeterminate'
+                              : false
+                        }
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all themes"
+                      />
+                    </th>
+                  )}
+                  <th className="w-20 px-4 py-2 text-left font-medium">
+                    Photo
                   </th>
-                )}
-                <th className="px-4 py-2 text-left font-medium">
-                  <button
-                    type="button"
-                    className="flex cursor-pointer items-center gap-1 font-medium"
-                    onClick={() => toggleSort('name')}
-                  >
-                    Name
-                    <SortIcon col="name" />
-                  </button>
-                </th>
-                <th className="px-4 py-2 text-left font-medium">
-                  <button
-                    type="button"
-                    className="flex cursor-pointer items-center gap-1 font-medium"
-                    onClick={() => toggleSort('price')}
-                  >
-                    Price
-                    <SortIcon col="price" />
-                  </button>
-                </th>
-                <th className="px-4 py-2 text-center font-medium">Photos</th>
-                <th className="px-4 py-2 text-center font-medium">Videos</th>
-                <th className="px-4 py-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedThemes.map((t) => {
-                const draft = priceDrafts[t.id]
-                const priceValue =
-                  draft !== undefined
-                    ? draft
-                    : t.price != null
-                      ? String(t.price)
-                      : ''
-                const isDragOver = dragOverId === t.id
-                const isUploading = uploadingId === t.id
-                return (
-                  <tr
-                    key={t.id}
-                    className={
-                      'border-border/40 border-t transition-colors ' +
-                      (isDragOver
-                        ? 'bg-primary/5 outline-primary outline-2 -outline-offset-2'
-                        : '')
-                    }
-                    onDragOver={
-                      canEdit
-                        ? (e) => {
-                            e.preventDefault()
-                            e.dataTransfer.dropEffect = 'copy'
-                            if (dragOverId !== t.id) setDragOverId(t.id)
-                          }
-                        : undefined
-                    }
-                    onDragLeave={
-                      canEdit
-                        ? (e) => {
-                            // Only clear when the pointer actually leaves the row,
-                            // not when moving between its cells.
-                            if (
-                              !e.currentTarget.contains(
-                                e.relatedTarget as Node | null
-                              )
-                            )
-                              setDragOverId((cur) =>
-                                cur === t.id ? null : cur
-                              )
-                          }
-                        : undefined
-                    }
-                    onDrop={
-                      canEdit
-                        ? (e) => {
-                            e.preventDefault()
-                            setDragOverId(null)
-                            const files = Array.from(e.dataTransfer.files)
-                            if (files.length && !isUploading)
-                              void uploadToTheme(t, files)
-                          }
-                        : undefined
-                    }
-                  >
-                    {canEdit && (
-                      <td className="px-4 py-3">
-                        <Checkbox
-                          checked={selected.has(t.id)}
-                          onCheckedChange={() => toggleSelectOne(t.id)}
-                          aria-label={`Select ${t.name}`}
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/services/${serviceId}/themes/${t.id}`}
-                        className="text-foreground font-medium hover:underline"
-                      >
-                        {t.name}
-                      </Link>
-                      {isUploading ? (
-                        <p className="text-primary mt-0.5 flex items-center gap-1 text-xs">
-                          <IconLoader2 className="size-3.5 animate-spin" />
-                          Uploading…
-                        </p>
-                      ) : isDragOver ? (
-                        <p className="text-primary mt-0.5 flex items-center gap-1 text-xs">
-                          <IconUpload className="size-3.5" />
-                          Drop images or videos to upload
-                        </p>
-                      ) : (
-                        t.description && (
-                          <p className="text-muted-foreground mt-0.5 text-xs">
-                            {t.description.length > 60
-                              ? `${t.description.slice(0, 60)}…`
-                              : t.description}
-                          </p>
-                        )
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {canEdit ? (
-                        <Input
-                          type="number"
-                          min={0}
-                          size="sm"
-                          className="w-28"
-                          placeholder="—"
-                          value={priceValue}
-                          disabled={savingPrice.has(t.id)}
-                          onChange={(e) =>
-                            setPriceDrafts((prev) => ({
-                              ...prev,
-                              [t.id]: e.target.value,
-                            }))
-                          }
-                          onBlur={() => savePrice(t)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                  <th className="px-4 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="flex cursor-pointer items-center gap-1 font-medium"
+                      onClick={() => toggleSort('name')}
+                    >
+                      Name
+                      <SortIcon col="name" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium">
+                    <button
+                      type="button"
+                      className="flex cursor-pointer items-center gap-1 font-medium"
+                      onClick={() => toggleSort('price')}
+                    >
+                      Price
+                      <SortIcon col="price" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-2 text-center font-medium">Photos</th>
+                  <th className="px-4 py-2 text-center font-medium">Videos</th>
+                  <th className="px-4 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedThemes.map((t) => {
+                  const draft = priceDrafts[t.id]
+                  const priceValue =
+                    draft !== undefined
+                      ? draft
+                      : t.price != null
+                        ? String(t.price)
+                        : ''
+                  const isDragOver = dragOverId === t.id
+                  const isUploading = uploadingId === t.id
+                  return (
+                    <tr
+                      key={t.id}
+                      className={
+                        'border-border/40 border-t transition-colors ' +
+                        (isDragOver
+                          ? 'bg-primary/5 outline-primary outline-2 -outline-offset-2'
+                          : '')
+                      }
+                      onDragOver={
+                        canEdit
+                          ? (e) => {
                               e.preventDefault()
-                              ;(e.target as HTMLInputElement).blur()
+                              e.dataTransfer.dropEffect = 'copy'
+                              if (dragOverId !== t.id) setDragOverId(t.id)
                             }
-                          }}
-                        />
-                      ) : t.price != null ? (
-                        `₹ ${t.price.toLocaleString('en-IN')}`
-                      ) : (
-                        '—'
+                          : undefined
+                      }
+                      onDragLeave={
+                        canEdit
+                          ? (e) => {
+                              // Only clear when the pointer actually leaves the row,
+                              // not when moving between its cells.
+                              if (
+                                !e.currentTarget.contains(
+                                  e.relatedTarget as Node | null
+                                )
+                              )
+                                setDragOverId((cur) =>
+                                  cur === t.id ? null : cur
+                                )
+                            }
+                          : undefined
+                      }
+                      onDrop={
+                        canEdit
+                          ? (e) => {
+                              e.preventDefault()
+                              setDragOverId(null)
+                              const files = Array.from(e.dataTransfer.files)
+                              if (files.length && !isUploading)
+                                void uploadToTheme(t, files)
+                            }
+                          : undefined
+                      }
+                    >
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <Checkbox
+                            checked={selected.has(t.id)}
+                            onCheckedChange={() => toggleSelectOne(t.id)}
+                            aria-label={`Select ${t.name}`}
+                          />
+                        </td>
                       )}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1">
-                        <IconPhoto className="size-3.5" />
-                        {t.media.length}
-                      </span>
-                    </td>
-                    <td className="text-muted-foreground px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1">
-                        <IconVideo className="size-3.5" />
-                        {t.videos.length}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          asChild
-                          variant="ghost-muted"
-                          size="sm"
-                          className="size-8 p-0"
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const cover = themeCover(t)
+                          return cover ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreview({ url: cover, name: t.name })
+                              }
+                              className="focus-visible:ring-ring relative size-14 cursor-zoom-in overflow-hidden rounded focus:outline-none focus-visible:ring-2"
+                              aria-label={`Preview ${t.name}`}
+                            >
+                              <Image
+                                src={cover}
+                                alt={t.name}
+                                fill
+                                sizes="56px"
+                                loading="lazy"
+                                className="object-cover"
+                                unoptimized
+                              />
+                            </button>
+                          ) : (
+                            <div className="bg-muted text-muted-foreground flex size-14 items-center justify-center rounded">
+                              <IconPhoto className="size-5" />
+                            </div>
+                          )
+                        })()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/services/${serviceId}/themes/${t.id}`}
+                          className="text-foreground font-medium hover:underline"
                         >
-                          <Link href={`/services/${serviceId}/themes/${t.id}`}>
-                            <IconPencil className="size-4" />
-                          </Link>
-                        </Button>
-                        {canEdit && (
+                          {t.name}
+                        </Link>
+                        {isUploading ? (
+                          <p className="text-primary mt-0.5 flex items-center gap-1 text-xs">
+                            <IconLoader2 className="size-3.5 animate-spin" />
+                            Uploading…
+                          </p>
+                        ) : isDragOver ? (
+                          <p className="text-primary mt-0.5 flex items-center gap-1 text-xs">
+                            <IconUpload className="size-3.5" />
+                            Drop images or videos to upload
+                          </p>
+                        ) : (
+                          t.description && (
+                            <p className="text-muted-foreground mt-0.5 text-xs">
+                              {t.description.length > 60
+                                ? `${t.description.slice(0, 60)}…`
+                                : t.description}
+                            </p>
+                          )
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canEdit ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            size="sm"
+                            className="w-28"
+                            placeholder="—"
+                            value={priceValue}
+                            disabled={savingPrice.has(t.id)}
+                            onChange={(e) =>
+                              setPriceDrafts((prev) => ({
+                                ...prev,
+                                [t.id]: e.target.value,
+                              }))
+                            }
+                            onBlur={() => savePrice(t)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                ;(e.target as HTMLInputElement).blur()
+                              }
+                            }}
+                          />
+                        ) : t.price != null ? (
+                          `₹ ${t.price.toLocaleString('en-IN')}`
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="text-muted-foreground px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1">
+                          <IconPhoto className="size-3.5" />
+                          {t.media.length}
+                        </span>
+                      </td>
+                      <td className="text-muted-foreground px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1">
+                          <IconVideo className="size-3.5" />
+                          {t.videos.length}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
                           <Button
-                            type="button"
+                            asChild
                             variant="ghost-muted"
                             size="sm"
-                            className="text-destructive hover:text-destructive size-8 p-0"
-                            onClick={() =>
-                              setDeleteTarget({
-                                kind: 'single',
-                                id: t.id,
-                                name: t.name,
-                              })
-                            }
+                            className="size-8 p-0"
                           >
-                            <IconTrash className="size-4" />
+                            <Link
+                              href={`/services/${serviceId}/themes/${t.id}`}
+                            >
+                              <IconPencil className="size-4" />
+                            </Link>
                           </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                          {canEdit && (
+                            <Button
+                              type="button"
+                              variant="ghost-muted"
+                              size="sm"
+                              className="text-destructive hover:text-destructive size-8 p-0"
+                              onClick={() =>
+                                setDeleteTarget({
+                                  kind: 'single',
+                                  id: t.id,
+                                  name: t.name,
+                                })
+                              }
+                            >
+                              <IconTrash className="size-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="border-border bg-muted/20 flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Rows per page</span>
+              <Select
+                options={PAGE_SIZE_OPTIONS}
+                value={String(pageSize)}
+                onChange={(v) => {
+                  setPage(1)
+                  setPageSize(Number(v ?? 20))
+                }}
+                size="sm"
+                className="w-20"
+              />
+              <span className="text-muted-foreground">of {total} themes</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground mr-2">
+                {total === 0
+                  ? '0'
+                  : `${(page - 1) * pageSize + 1}–${Math.min(
+                      page * pageSize,
+                      total
+                    )}`}{' '}
+                of {total}
+              </span>
+              <Button
+                variant="ghost-muted"
+                size="sm"
+                className="size-8 p-0"
+                disabled={page <= 1 || paging}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
+              >
+                <IconChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="ghost-muted"
+                size="sm"
+                className="size-8 p-0"
+                disabled={page >= totalPages || paging}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
+              >
+                <IconChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       )}
+
+      <ImagePreviewDialog
+        open={!!preview}
+        onOpenChange={(o) => !o && setPreview(null)}
+        url={preview?.url ?? null}
+        title={preview?.name}
+      />
 
       <Dialog
         open={!!deleteTarget}

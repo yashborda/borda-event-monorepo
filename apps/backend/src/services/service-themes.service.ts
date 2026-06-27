@@ -3,9 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DrizzleService } from '../database/drizzle.service.js';
+import { mediaFiles } from '../database/schema/media-files.table.js';
+import { serviceMedia } from '../database/schema/service-media.table.js';
 import { serviceThemes } from '../database/schema/service-themes.table.js';
+import { serviceVideos } from '../database/schema/service-videos.table.js';
 import { services } from '../database/schema/services.table.js';
 import { RevalidationService } from '../common/services/revalidation.service.js';
 import type { CreateServiceThemeDto } from './dto/create-service-theme.dto.js';
@@ -26,6 +29,134 @@ export class ServiceThemesService {
       .where(eq(serviceThemes.serviceId, serviceId))
       .orderBy(asc(serviceThemes.sortOrder), asc(serviceThemes.createdAt));
     return rows.map((t) => this.serialize(t));
+  }
+
+  /**
+   * One page of themes WITH their media + videos, for the admin table. Media is
+   * fetched only for the themes on the page (not the whole service), so a
+   * service with hundreds of themes stays cheap to render.
+   *
+   * sortBy: 'name' (default, natural-ish via lower()) | 'price' (nulls last).
+   */
+  async listPaged(
+    serviceId: string,
+    page = 1,
+    limit = 20,
+    sortBy: 'name' | 'price' = 'name',
+    sortDir: 'asc' | 'desc' = 'asc',
+  ) {
+    await this.getServiceOrThrow(serviceId);
+
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const offset = (safePage - 1) * safeLimit;
+    const dir = sortDir === 'desc' ? desc : asc;
+
+    // Price nulls always sort last regardless of direction; name uses lower()
+    // for case-insensitive ordering, tie-broken by sortOrder for stability.
+    const orderBy =
+      sortBy === 'price'
+        ? [sql`${serviceThemes.price} IS NULL`, dir(serviceThemes.price)]
+        : [
+            dir(sql`lower(${serviceThemes.name})`),
+            asc(serviceThemes.sortOrder),
+          ];
+
+    const [themeRows, [{ total }]] = await Promise.all([
+      this.drizzle.db
+        .select()
+        .from(serviceThemes)
+        .where(eq(serviceThemes.serviceId, serviceId))
+        .orderBy(...orderBy)
+        .limit(safeLimit)
+        .offset(offset),
+      this.drizzle.db
+        .select({ total: count() })
+        .from(serviceThemes)
+        .where(eq(serviceThemes.serviceId, serviceId)),
+    ]);
+
+    const data = await this.attachMedia(themeRows);
+    return { data, total, page: safePage, limit: safeLimit };
+  }
+
+  /** Group each page-theme's media + videos onto it (page-scoped, not service-wide). */
+  private async attachMedia(themeRows: (typeof serviceThemes.$inferSelect)[]) {
+    if (themeRows.length === 0) return [];
+    const themeIds = themeRows.map((t) => t.id);
+
+    const [mediaRows, videoRows] = await Promise.all([
+      this.drizzle.db
+        .select({
+          themeId: serviceMedia.themeId,
+          id: mediaFiles.id,
+          url: mediaFiles.url,
+          folder: mediaFiles.folder,
+          originalName: mediaFiles.originalName,
+          mimeType: mediaFiles.mimeType,
+          size: mediaFiles.size,
+          isFeatured: serviceMedia.isFeatured,
+          sortOrder: serviceMedia.sortOrder,
+        })
+        .from(serviceMedia)
+        .innerJoin(mediaFiles, eq(serviceMedia.mediaId, mediaFiles.id))
+        .where(inArray(serviceMedia.themeId, themeIds))
+        .orderBy(asc(serviceMedia.sortOrder)),
+      this.drizzle.db
+        .select({
+          themeId: serviceVideos.themeId,
+          id: serviceVideos.id,
+          type: serviceVideos.type,
+          title: serviceVideos.title,
+          instagramUrl: serviceVideos.instagramUrl,
+          driveFileId: serviceVideos.driveFileId,
+          driveUrl: serviceVideos.driveUrl,
+          isFeatured: serviceVideos.isFeatured,
+          sortOrder: serviceVideos.sortOrder,
+        })
+        .from(serviceVideos)
+        .where(inArray(serviceVideos.themeId, themeIds))
+        .orderBy(asc(serviceVideos.sortOrder)),
+    ]);
+
+    const mediaByTheme = new Map<string, typeof mediaRows>();
+    for (const m of mediaRows) {
+      if (!m.themeId) continue;
+      const arr = mediaByTheme.get(m.themeId) ?? [];
+      arr.push(m);
+      mediaByTheme.set(m.themeId, arr);
+    }
+    const videosByTheme = new Map<string, typeof videoRows>();
+    for (const v of videoRows) {
+      if (!v.themeId) continue;
+      const arr = videosByTheme.get(v.themeId) ?? [];
+      arr.push(v);
+      videosByTheme.set(v.themeId, arr);
+    }
+
+    return themeRows.map((t) => ({
+      ...this.serialize(t),
+      media: (mediaByTheme.get(t.id) ?? []).map((m) => ({
+        id: m.id,
+        url: m.url,
+        folder: m.folder,
+        originalName: m.originalName,
+        mimeType: m.mimeType,
+        size: m.size,
+        isFeatured: m.isFeatured,
+        sortOrder: m.sortOrder,
+      })),
+      videos: (videosByTheme.get(t.id) ?? []).map((v) => ({
+        id: v.id,
+        type: v.type,
+        title: v.title,
+        instagramUrl: v.instagramUrl,
+        driveFileId: v.driveFileId,
+        driveUrl: v.driveUrl,
+        isFeatured: v.isFeatured,
+        sortOrder: v.sortOrder,
+      })),
+    }));
   }
 
   async create(
@@ -56,7 +187,10 @@ export class ServiceThemesService {
       })
       .returning();
 
-    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
     return this.serialize(inserted);
   }
 
@@ -80,7 +214,10 @@ export class ServiceThemesService {
       .where(eq(serviceThemes.id, themeId))
       .limit(1);
 
-    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
     return this.serialize(updated);
   }
 
@@ -96,7 +233,10 @@ export class ServiceThemesService {
       .delete(serviceThemes)
       .where(eq(serviceThemes.id, themeId));
 
-    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
     return { message: 'Theme deleted' };
   }
 
@@ -133,7 +273,10 @@ export class ServiceThemesService {
         ),
       );
 
-    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
     return { message: `${ids.length} theme(s) deleted`, count: ids.length };
   }
 
@@ -162,7 +305,10 @@ export class ServiceThemesService {
       }
     });
 
-    this.revalidationService.revalidate(['services', `service-${service.slug}`]);
+    this.revalidationService.revalidate([
+      'services',
+      `service-${service.slug}`,
+    ]);
     return this.listAll(serviceId);
   }
 

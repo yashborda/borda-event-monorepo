@@ -127,10 +127,7 @@ export class ServicesController {
 
   @Patch(':id/media/:mediaId/featured')
   @RequirePermissions('services:update')
-  setMediaFeatured(
-    @Param('id') id: string,
-    @Param('mediaId') mediaId: string,
-  ) {
+  setMediaFeatured(@Param('id') id: string, @Param('mediaId') mediaId: string) {
     return this.servicesService.setMediaFeatured(id, mediaId);
   }
 
@@ -151,10 +148,24 @@ export class ServicesController {
   }
 
   // ── Service themes ─────────────────────────────────────────
+  // Paginated themes WITH media + videos for the admin table. Returns
+  // { data, total, page, limit }.
   @Get(':id/themes')
   @RequirePermissions('services:read')
-  listThemes(@Param('id') id: string) {
-    return this.themesService.listAll(id);
+  listThemes(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
+  ) {
+    return this.themesService.listPaged(
+      id,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      sortBy === 'price' ? 'price' : 'name',
+      sortDir === 'desc' ? 'desc' : 'asc',
+    );
   }
 
   @Post(':id/themes')
@@ -169,10 +180,7 @@ export class ServicesController {
 
   @Patch(':id/themes/reorder')
   @RequirePermissions('services:update')
-  reorderThemes(
-    @Param('id') id: string,
-    @Body() dto: ReorderServiceThemesDto,
-  ) {
+  reorderThemes(@Param('id') id: string, @Body() dto: ReorderServiceThemesDto) {
     return this.themesService.reorder(id, dto.themeIds);
   }
 
@@ -197,10 +205,7 @@ export class ServicesController {
 
   @Delete(':id/themes/:themeId')
   @RequirePermissions('services:update')
-  deleteTheme(
-    @Param('id') id: string,
-    @Param('themeId') themeId: string,
-  ) {
+  deleteTheme(@Param('id') id: string, @Param('themeId') themeId: string) {
     return this.themesService.remove(id, themeId);
   }
 }
