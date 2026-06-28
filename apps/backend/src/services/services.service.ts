@@ -284,6 +284,18 @@ export class ServicesService {
 
     if (existingSlug) throw new ConflictException('Slug already in use');
 
+    // Default a new service to the end of the list (max sortOrder + 1) so it
+    // doesn't collide at 0 with existing services. An explicit dto value wins.
+    let sortOrder = dto.sortOrder;
+    if (sortOrder == null) {
+      const [{ maxOrder }] = await this.drizzle.db
+        .select({
+          maxOrder: sql<number>`COALESCE(MAX(${services.sortOrder}), 0)::int`,
+        })
+        .from(services);
+      sortOrder = maxOrder + 1;
+    }
+
     const [service] = await this.drizzle.db
       .insert(services)
       .values({
@@ -293,7 +305,7 @@ export class ServicesService {
         coverImageId: dto.coverImageId,
         bannerImageId: dto.bannerImageId,
         isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
+        sortOrder,
         createdBy: createdById,
       })
       .returning();

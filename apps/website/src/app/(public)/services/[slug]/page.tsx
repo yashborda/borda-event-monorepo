@@ -1,28 +1,58 @@
-import type { IServiceDetail, IServiceThemeVideo } from '@pkg/types'
-import { Button } from '@pkg/ui'
-import {
-  IconBrandWhatsapp,
-  IconCheck,
-  IconChevronRight,
-  IconPhone,
-} from '@tabler/icons-react'
+import type { IServiceDetail, IServiceThemeVideo } from '@pkg/types';
+import { Button } from '@pkg/ui';
+import { IconBrandWhatsapp, IconCheck, IconChevronRight, IconPhone } from '@tabler/icons-react';
 
-import type { Metadata } from 'next'
-import Image from 'next/image'
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
 
-import { getServiceBySlug, getServiceSlugs } from '@/lib/services-api'
 
-import { getPageSeoMetadata } from '@/utils/seo.helper'
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
-import { TEL, serviceEnquiry } from '@/config/site'
-import { RESOURCE_COVERS, RESOURCE_GALLERY } from '@/content/media'
-import { FEATURED_SERVICES } from '@/content/services'
 
-import { WhatsAppCta } from '../../_components/whatsapp-cta'
-import { type GalleryImage } from './_components/photo-slider'
-import { ThemePriceBuckets } from './_components/theme-price-buckets'
+
+import { getServiceBySlug, getServiceSlugs } from '@/lib/services-api';
+
+
+
+import { getPageSeoMetadata } from '@/utils/seo.helper';
+
+
+
+import { TEL, serviceEnquiry } from '@/config/site';
+import { RESOURCE_COVERS, RESOURCE_GALLERY } from '@/content/media';
+import { FEATURED_SERVICES } from '@/content/services';
+
+
+
+import { WhatsAppCta } from '../../_components/whatsapp-cta';
+import { type GalleryImage } from './_components/photo-slider';
+import { ThemePriceBuckets } from './_components/theme-price-buckets';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 type Props = { params: Promise<{ slug: string }> }
 
@@ -306,18 +336,20 @@ const ServiceDetailPage = async ({ params }: Props) => {
       {/* Themes grouped into ₹5000 price bands (collapsible). Each theme shows
           its cover + extra photos slider, with its video beside on desktop. */}
       {buckets.length > 0 && (
-        <section className="bg-muted/30 px-6 py-14 md:py-20">
-          <div className="mx-auto mb-8 max-w-6xl">
-            <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
-              Themes &amp; pricing
-            </h2>
-            <p className="text-muted-foreground text-body-md mt-2">
-              Browse {name.toLowerCase()} themes by budget — tap a price range
-              to see its photos and videos.
-            </p>
-          </div>
+        <>
+          <section className="bg-muted/30 px-6 pt-14 pb-8 md:pt-20">
+            <div className="mx-auto max-w-6xl">
+              <h2 className="text-brand-ink font-display text-2xl font-bold md:text-3xl">
+                Themes &amp; pricing
+              </h2>
+              <p className="text-muted-foreground text-body-md mt-2">
+                Browse {name.toLowerCase()} themes by budget — tap a price range
+                to see its photos and videos.
+              </p>
+            </div>
+          </section>
           <ThemePriceBuckets buckets={buckets} />
-        </section>
+        </>
       )}
 
       <WhatsAppCta

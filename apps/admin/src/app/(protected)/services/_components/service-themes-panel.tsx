@@ -1,6 +1,10 @@
 'use client'
 
-import type { IApiError, IServiceThemeWithMedia } from '@pkg/types'
+import type {
+  IApiError,
+  IService,
+  IServiceThemeWithMedia,
+} from '@pkg/types'
 import {
   Button,
   Checkbox,
@@ -88,6 +92,12 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
   const [adding, setAdding] = useState(false)
   const [addExistingOpen, setAddExistingOpen] = useState(false)
 
+  // Bulk "add selected themes to another service".
+  const [bulkLinkOpen, setBulkLinkOpen] = useState(false)
+  const [bulkTargetId, setBulkTargetId] = useState('')
+  const [bulkLinking, setBulkLinking] = useState(false)
+  const [allServices, setAllServices] = useState<IService[]>([])
+
   // Inline price editing: themeId → draft string while focused.
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({})
   const [savingPrice, setSavingPrice] = useState<Set<string>>(new Set())
@@ -160,6 +170,48 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
 
   // Refetch the current page after a mutation (upload/delete/price).
   const reload = () => fetchPage({ silent: true })
+
+  // All services, fetched once — the target options for bulk "add to service".
+  useEffect(() => {
+    if (!canEdit) return
+    apiFetch<{ data: IService[] }>('/api/admin/services?limit=100')
+      .then((res) => setAllServices(res.data))
+      .catch((e: IApiError) => handleException(e))
+  }, [canEdit])
+
+  // Link every selected theme into the chosen target service. Failures don't
+  // abort the batch; a theme already in the target is reported but skipped.
+  const bulkLinkToService = async () => {
+    if (!bulkTargetId || selected.size === 0) return
+    setBulkLinking(true)
+    const ids = [...selected]
+    let ok = 0
+    let failed = 0
+    for (const themeId of ids) {
+      try {
+        await apiFetch(
+          `/api/admin/services/${bulkTargetId}/themes/${themeId}/link`,
+          { method: 'POST' }
+        )
+        ok++
+      } catch (e) {
+        failed++
+        handleException(e as IApiError)
+      }
+    }
+    setBulkLinking(false)
+    setBulkLinkOpen(false)
+    setBulkTargetId('')
+    setSelected(new Set())
+    if (ok > 0) {
+      const target = allServices.find((s) => s.id === bulkTargetId)
+      toast.success(
+        `${ok} theme${ok > 1 ? 's' : ''} added to ${target?.name ?? 'service'}` +
+          (failed > 0 ? ` (${failed} skipped)` : '')
+      )
+    }
+    await reload()
+  }
 
   // Clamp to the last page when deletes shrink the total below the cursor.
   useEffect(() => {
@@ -429,17 +481,28 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
               Clear
             </button>
           </span>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() =>
-              setDeleteTarget({ kind: 'bulk', ids: [...selected] })
-            }
-          >
-            <IconTrash className="size-4" />
-            Delete selected
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkLinkOpen(true)}
+            >
+              <IconLink className="size-4" />
+              Add to service
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() =>
+                setDeleteTarget({ kind: 'bulk', ids: [...selected] })
+              }
+            >
+              <IconTrash className="size-4" />
+              Delete selected
+            </Button>
+          </div>
         </div>
       )}
 
@@ -786,6 +849,41 @@ export function ServiceThemesPanel({ serviceId, disabled }: IPanelProps) {
         onOpenChange={setAddExistingOpen}
         onLinked={reload}
       />
+
+      {/* Bulk: add the selected themes to another service (sharing — no copy). */}
+      <Dialog
+        open={bulkLinkOpen}
+        onOpenChange={(o) => !o && !bulkLinking && setBulkLinkOpen(false)}
+        title="Add selected themes to a service"
+        description={`${selected.size} theme${selected.size === 1 ? '' : 's'} will be shared into the chosen service. Their photos and videos are shared — nothing is duplicated.`}
+        actions={[
+          {
+            label: 'Cancel',
+            variant: 'outline-muted',
+            onClick: () => setBulkLinkOpen(false),
+            disabled: bulkLinking,
+            className: 'ml-auto',
+          },
+          {
+            label: bulkLinking ? 'Adding…' : 'Add to service',
+            variant: 'default',
+            onClick: bulkLinkToService,
+            disabled: bulkLinking || !bulkTargetId,
+          },
+        ]}
+      >
+        <Select
+          id="bulk-link-service"
+          label="Target service"
+          placeholder="Select a service…"
+          options={allServices
+            .filter((s) => s.id !== serviceId && !s.deletedAt)
+            .map((s) => ({ value: s.id, label: s.name }))}
+          value={bulkTargetId || undefined}
+          onChange={(v) => setBulkTargetId(v ?? '')}
+          disabled={bulkLinking}
+        />
+      </Dialog>
 
       <ImagePreviewDialog
         open={!!preview}

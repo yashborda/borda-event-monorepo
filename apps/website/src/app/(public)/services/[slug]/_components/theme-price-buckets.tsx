@@ -1,15 +1,78 @@
 'use client'
 
-import type { IServiceThemeVideo } from '@pkg/types'
-import { cn } from '@pkg/ui'
-import { IconChevronDown, IconX } from '@tabler/icons-react'
+import type { IServiceThemeVideo } from '@pkg/types';
+import { cn } from '@pkg/ui';
+import { IconX } from '@tabler/icons-react';
 
-import Image from 'next/image'
 
-import * as React from 'react'
 
-import { type GalleryImage, PhotoSlider } from './photo-slider'
-import { ThemeVideos } from './theme-videos'
+import Image from 'next/image';
+
+
+
+import * as React from 'react';
+
+
+
+import { type GalleryImage, PhotoSlider } from './photo-slider';
+import { ThemeVideos } from './theme-videos';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export type BucketSection = {
   key: string
@@ -166,16 +229,24 @@ const ThemeRow = ({ section }: { section: BucketSection }) => {
   const useVerticalSplit = split && photoCount > 1
 
   const perView = { base: 2, sm: 3, lg: 3 }
+  // Vertical (stacked) only on mobile, where the photo column sits in its own
+  // aspect-9/16 wrapper beside the portrait video. On desktop the photos stay
+  // a horizontal 3-up strip.
   const vertical = useVerticalSplit
     ? { base: true, sm: false, lg: false }
     : false
+  // On desktop the photo strip is 3 tiles wide in the wide (4fr) column while
+  // the video is a tall 9/16 portrait in the narrow (1fr) column. Square tiles
+  // would leave the photo strip much shorter than the video. A portrait tile
+  // (~3/4 w:h) raises the strip's height so it matches the video's height.
+  const tileAspect = useVerticalSplit ? 3 / 4 : 1
 
   return (
     <div
       id={themeAnchorId(section.key)}
       className={cn(
-        'grid scroll-mt-24 items-start gap-4 sm:gap-6',
-        split && 'grid-cols-2 sm:grid-cols-[3fr_1fr] lg:grid-cols-[4fr_1fr]'
+        'grid scroll-mt-24 items-start gap-4 sm:gap-0',
+        split && 'grid-cols-2 sm:grid-cols-[3fr_1fr]'
       )}
     >
       {hasPhotos && (
@@ -184,6 +255,7 @@ const ThemeRow = ({ section }: { section: BucketSection }) => {
             images={section.images}
             perView={perView}
             vertical={vertical}
+            tileAspect={tileAspect}
           />
         </div>
       )}
@@ -197,24 +269,17 @@ const ThemeRow = ({ section }: { section: BucketSection }) => {
 }
 
 /**
- * Collapsible price bands. The first band starts open; the rest are collapsed
- * so their images/videos are NOT rendered (and therefore not fetched) until the
- * visitor expands that price range — keeping the page light when a service has
- * dozens of themes.
+ * Price bands, all rendered open. Each band shows its heading, a cover grid of
+ * themes, and the full detail rows beneath — no collapse toggle.
  */
 export const ThemePriceBuckets = ({
   buckets,
 }: {
   buckets: PriceBucketData[]
 }) => {
-  const [openKey, setOpenKey] = React.useState<string | null>(
-    buckets[0]?.key ?? null
-  )
-
   return (
-    <div className="mx-auto max-w-6xl space-y-4 scroll-smooth">
-      {buckets.map((bucket) => {
-        const isOpen = openKey === bucket.key
+    <>
+      {buckets.map((bucket, i) => {
         const themeCount = bucket.sections.length
         // Show the cover grid for multi-theme bands, OR whenever any theme is a
         // single-photo theme — those have no bottom row, so the grid is their
@@ -227,41 +292,28 @@ export const ThemePriceBuckets = ({
         return (
           <div
             key={bucket.key}
-            className="border-border/60 overflow-hidden rounded-xl border bg-white/60"
+            className={cn('py-8', i % 2 === 0 ? 'bg-white' : 'bg-muted/30')}
           >
-            <button
-              type="button"
-              aria-expanded={isOpen}
-              onClick={() => setOpenKey(isOpen ? null : bucket.key)}
-              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-white"
-            >
-              <span className="flex items-baseline gap-3">
+            <div className="mx-auto max-w-6xl overflow-hidden scroll-smooth rounded-xl">
+              {/* <div className="flex items-baseline gap-3 px-5 py-4">
                 <span className="text-brand-ink font-display text-lg font-bold md:text-xl">
                   {bucket.label}
                 </span>
                 <span className="text-muted-foreground text-sm">
                   {themeCount} {themeCount === 1 ? 'theme' : 'themes'}
                 </span>
-              </span>
-              <IconChevronDown
-                className={cn(
-                  'text-brand-copper size-5 shrink-0 transition-transform duration-300',
-                  isOpen && 'rotate-180'
-                )}
-              />
-            </button>
+              </div> */}
 
-            {isOpen && (
-              <div className="space-y-8 px-5 pt-2 pb-6 md:space-y-12">
+              <div className="space-y-4 px-5 pt-2 pb-6 md:space-y-8">
                 {/* Cover grid first — one tile per theme; tapping scrolls down
-                    to that theme's full slider + video. Only worth showing when
-                    the band holds more than one theme. */}
+                  to that theme's full slider + video. Only worth showing when
+                  the band holds more than one theme. */}
                 {showCoverGrid && <ThemeCoverGrid sections={bucket.sections} />}
                 {/* Bottom detail rows only for themes with extra content
-                    (more photos or a video). A single-photo theme is already
-                    fully shown by its cover tile + modal preview above.
-                    Photo-only themes are listed first, then video themes —
-                    a stable sort keeps each group's existing order. */}
+                  (more photos or a video). A single-photo theme is already
+                  fully shown by its cover tile + modal preview above.
+                  Photo-only themes are listed first, then video themes —
+                  a stable sort keeps each group's existing order. */}
                 {bucket.sections
                   .filter(hasExtraContent)
                   .sort(
@@ -272,10 +324,10 @@ export const ThemePriceBuckets = ({
                     <ThemeRow key={section.key} section={section} />
                   ))}
               </div>
-            )}
+            </div>
           </div>
         )
       })}
-    </div>
+    </>
   )
 }
