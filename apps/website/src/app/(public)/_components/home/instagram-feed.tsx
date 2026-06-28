@@ -17,7 +17,7 @@ export const InstagramFeed = ({ items }: { items: FeedItem[] }) => {
   if (!items.length) return null
 
   return (
-    <section className="px-6 py-16 md:py-24">
+    <section className="px-6 py-10 md:py-24">
       <div className="border-border/60 bg-card mx-auto max-w-6xl rounded-md border p-5 shadow-sm md:p-6">
         {/* Header */}
         <div className="flex items-center justify-between gap-4">

@@ -67,14 +67,14 @@ const ServicesPage = async () => {
       </section>
 
       {/* All services grid */}
-      <section className="px-6 py-16 md:py-24">
+      <section className="px-6 py-10 md:py-24">
         <div className="mx-auto max-w-6xl">
           <ServicesGrid services={services} />
         </div>
       </section>
 
       {/* Spotlight */}
-      <section className="bg-muted/40 px-6 py-16 md:py-24">
+      <section className="bg-muted/40 px-6 py-10 md:py-24">
         <div className="mx-auto max-w-6xl">
           <SectionHeading
             align="center"

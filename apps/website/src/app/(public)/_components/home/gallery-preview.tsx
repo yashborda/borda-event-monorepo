@@ -13,7 +13,7 @@ const TILES = GALLERY_IMAGES.slice(0, 6)
 const SPAN = ['sm:row-span-2', '', '', 'sm:col-span-2', '', 'sm:row-span-2']
 
 export const GalleryPreview = () => (
-  <section id="gallery" className="px-6 py-16 md:py-24">
+  <section id="gallery" className="px-6 py-10 md:py-24">
     <div className="mx-auto max-w-6xl">
       <SectionHeading align="center" label="Gallery" title="Our Work Speaks" />
 

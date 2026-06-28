@@ -59,11 +59,20 @@ export const PhotoSlider = ({
   perView = { base: 1, sm: 1, lg: 1 },
   tileAspect = 1,
   vertical = false,
+  fillHeight = false,
 }: {
   images: GalleryImage[]
   perView?: PerView
   tileAspect?: number
   vertical?: Vertical
+  /**
+   * Horizontal multi-up mode only: instead of deriving the strip's height from
+   * its own width (tileAspect), fill the parent's height (h-full). Each tile's
+   * WIDTH stays a fixed 1/lanes fraction; its height follows the parent. Use
+   * beside a tall portrait video in an `items-stretch` row so the photo strip
+   * matches the video's height exactly with no leftover gap.
+   */
+  fillHeight?: boolean
 }) => {
   const [index, setIndex] = React.useState(0)
   // Lane count tracks the live viewport width so it can differ per breakpoint.
@@ -141,7 +150,7 @@ export const PhotoSlider = ({
   return (
     <>
       <div
-        className={cn('group relative', isVertical && 'h-full')}
+        className={cn('group relative', (isVertical || fillHeight) && 'h-full')}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -160,15 +169,19 @@ export const PhotoSlider = ({
           <div
             className={cn(
               'relative overflow-hidden',
-              isVertical ? 'h-full w-full' : 'mr-auto'
+              isVertical ? 'h-full w-full' : fillHeight ? 'h-full' : 'mr-auto'
             )}
             style={
               isVertical
                 ? undefined
-                : {
-                    width: `${(visibleLanes / lanes) * 100}%`,
-                    aspectRatio: `${visibleLanes * tileAspect} / 1`,
-                  }
+                : fillHeight
+                  ? // Height comes from the parent (h-full); width is the
+                    // narrowed strip. No aspectRatio, so tiles fill the row.
+                    { width: `${(visibleLanes / lanes) * 100}%` }
+                  : {
+                      width: `${(visibleLanes / lanes) * 100}%`,
+                      aspectRatio: `${visibleLanes * tileAspect} / 1`,
+                    }
             }
           >
             <div

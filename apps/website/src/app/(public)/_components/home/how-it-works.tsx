@@ -21,7 +21,7 @@ const STEPS = [
 ]
 
 export const HowItWorks = () => (
-  <section className="bg-muted/40 px-6 py-16 md:py-24">
+  <section className="bg-muted/40 px-6 py-10 md:py-24">
     <div className="mx-auto max-w-5xl">
       <SectionHeading
         align="center"

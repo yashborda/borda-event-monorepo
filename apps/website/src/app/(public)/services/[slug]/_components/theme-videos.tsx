@@ -32,20 +32,33 @@ const toPermalink = (url: string): string => {
  * it behaves like an ambient reel. `driveUrl` is the direct public file URL.
  * Native controls stay available for sound/scrubbing.
  */
-const InlineVideo = ({ video }: { video: IServiceThemeVideo }) => {
+const InlineVideo = ({
+  video,
+  fillHeight = false,
+}: {
+  video: IServiceThemeVideo
+  fillHeight?: boolean
+}) => {
   if (!video.driveUrl) return null
   // The #t=0.1 media fragment makes the browser seek to ~0.1s and paint that
   // frame as a poster, so the tile shows a still instead of a black box before
   // autoplay kicks in.
   const src = `${video.driveUrl}#t=0.1`
   return (
-    <div className="border-border/60 bg-brand-ink/5 relative aspect-9/16 w-full overflow-hidden rounded-lg border shadow-sm">
+    <div
+      className={cn(
+        'border-border/60 bg-brand-ink/5 relative w-full overflow-hidden rounded-lg border shadow-sm',
+        // Default: portrait reel everywhere. fillHeight: portrait on mobile,
+        // but on desktop fill the sibling photo strip's height (aspect-auto +
+        // h-full) so the video matches the photos instead of towering over them.
+        fillHeight ? 'aspect-9/16 sm:aspect-auto sm:h-full' : 'aspect-9/16'
+      )}
+    >
       <video
         key={video.id}
         src={src}
         autoPlay
         muted
-        loop
         playsInline
         controls
         preload="metadata"
@@ -90,7 +103,14 @@ const InstagramEmbed = ({
  * slow auto-advance. Instagram reels use the official embed; uploaded (R2)
  * videos play directly inline, muted + autoplay + loop.
  */
-export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
+export const ThemeVideos = ({
+  videos,
+  fillHeight = false,
+}: {
+  videos: IServiceThemeVideo[]
+  /** Fill the parent's height (h-full) instead of the default portrait aspect. */
+  fillHeight?: boolean
+}) => {
   const [index, setIndex] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
 
@@ -119,12 +139,12 @@ export const ThemeVideos = ({ videos }: { videos: IServiceThemeVideo[] }) => {
 
   return (
     <div
-      className="relative"
+      className={cn('relative', fillHeight && 'sm:h-full')}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       {active.type === 'drive' && active.driveUrl ? (
-        <InlineVideo key={active.id} video={active} />
+        <InlineVideo key={active.id} video={active} fillHeight={fillHeight} />
       ) : active.instagramUrl ? (
         <InstagramEmbed
           key={active.id}

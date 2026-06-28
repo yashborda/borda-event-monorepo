@@ -1,78 +1,15 @@
 'use client'
 
-import type { IServiceThemeVideo } from '@pkg/types';
-import { cn } from '@pkg/ui';
-import { IconX } from '@tabler/icons-react';
+import type { IServiceThemeVideo } from '@pkg/types'
+import { cn } from '@pkg/ui'
+import { IconX } from '@tabler/icons-react'
 
+import Image from 'next/image'
 
+import * as React from 'react'
 
-import Image from 'next/image';
-
-
-
-import * as React from 'react';
-
-
-
-import { type GalleryImage, PhotoSlider } from './photo-slider';
-import { ThemeVideos } from './theme-videos';
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import { type GalleryImage, PhotoSlider } from './photo-slider'
+import { ThemeVideos } from './theme-videos'
 
 export type BucketSection = {
   key: string
@@ -227,41 +164,63 @@ const ThemeRow = ({ section }: { section: BucketSection }) => {
   // produced one tall tile per theme stacked down the page — so a single-photo
   // theme always uses the plain horizontal row of fixed-size tiles instead.
   const useVerticalSplit = split && photoCount > 1
+  // Video(s) but no photos: the portrait reel would stretch to the full row
+  // width (huge). Constrain it to a single narrow column so it reads like one
+  // cover tile rather than a giant block.
+  const videoOnly = hasVideos && !hasPhotos
 
-  const perView = { base: 2, sm: 3, lg: 3 }
-  // Vertical (stacked) only on mobile, where the photo column sits in its own
-  // aspect-9/16 wrapper beside the portrait video. On desktop the photos stay
-  // a horizontal 3-up strip.
+  // Photo-only themes use the full row width, so show 4-up on desktop — each
+  // tile is then a quarter-width square, matching the cover grid above. Beside a
+  // video the photo strip only gets the wide (3fr) column, so it stays 3-up.
+  const perView = split
+    ? { base: 2, sm: 3, lg: 3 }
+    : { base: 2, sm: 3, lg: 4 }
+  // Mobile only: stack photos vertically in their own aspect-9/16 wrapper beside
+  // the portrait video. On desktop photos are a horizontal strip of SQUARE tiles
+  // (the natural, consistent look) and the video shrinks to match that strip's
+  // height instead of towering over it.
   const vertical = useVerticalSplit
     ? { base: true, sm: false, lg: false }
     : false
-  // On desktop the photo strip is 3 tiles wide in the wide (4fr) column while
-  // the video is a tall 9/16 portrait in the narrow (1fr) column. Square tiles
-  // would leave the photo strip much shorter than the video. A portrait tile
-  // (~3/4 w:h) raises the strip's height so it matches the video's height.
-  const tileAspect = useVerticalSplit ? 3 / 4 : 1
 
   return (
     <div
       id={themeAnchorId(section.key)}
       className={cn(
-        'grid scroll-mt-24 items-start gap-4 sm:gap-0',
+        // Desktop: the horizontal photo strip already adds 0.375rem padding on
+        // its outer edge, so a gap-1.5 (0.375rem) row gap totals ~0.75rem before
+        // the video — matching the photo↔photo gap (and the cover grid's gap-3).
+        // Mobile: the vertical slider has no side padding, so use gap-3 there.
+        'grid scroll-mt-24 gap-3 sm:gap-0.5',
+        // On desktop stretch the cells so the video fills the (square) photo
+        // strip's height. Mobile keeps its own aspect wrappers, so start-align.
+        useVerticalSplit ? 'items-start sm:items-stretch' : 'items-start',
         split && 'grid-cols-2 sm:grid-cols-[3fr_1fr]'
       )}
     >
       {hasPhotos && (
+        // Mobile: own aspect-9/16 box for the vertical slider. Desktop: natural
+        // height from the square horizontal strip (defines the row height).
         <div className={cn(useVerticalSplit && 'aspect-9/16 sm:aspect-auto')}>
           <PhotoSlider
             images={section.images}
             perView={perView}
             vertical={vertical}
-            tileAspect={tileAspect}
           />
         </div>
       )}
       {hasVideos && (
-        <div>
-          <ThemeVideos videos={section.videos} />
+        // Desktop: fill the photo strip's height (h-full from the stretched
+        // row) so the video matches the photos instead of being a tall portrait.
+        // Video-only: cap the portrait reel to a narrow column (~one cover tile)
+        // so it doesn't blow up to full width.
+        <div
+          className={cn(
+            useVerticalSplit && 'sm:h-full',
+            videoOnly && 'w-1/2 max-w-65 sm:w-1/4'
+          )}
+        >
+          <ThemeVideos videos={section.videos} fillHeight={useVerticalSplit} />
         </div>
       )}
     </div>
@@ -304,7 +263,7 @@ export const ThemePriceBuckets = ({
                 </span>
               </div> */}
 
-              <div className="space-y-4 px-5 pt-2 pb-6 md:space-y-8">
+              <div className="space-y-4 px-5 py-2 md:space-y-8">
                 {/* Cover grid first — one tile per theme; tapping scrolls down
                   to that theme's full slider + video. Only worth showing when
                   the band holds more than one theme. */}

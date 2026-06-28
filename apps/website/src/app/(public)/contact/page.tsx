@@ -89,7 +89,7 @@ const ContactPage = () => {
         </div>
       </section>
 
-      <section className="px-6 py-16 md:py-24">
+      <section className="px-6 py-10 md:py-24">
         <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2">
           {/* Contact details */}
           <div>

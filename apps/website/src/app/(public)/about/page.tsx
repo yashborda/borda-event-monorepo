@@ -59,7 +59,7 @@ const AboutPage = () => (
     </section>
 
     {/* Story */}
-    <section className="px-6 py-16 md:py-24">
+    <section className="px-6 py-10 md:py-24">
       <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-2">
         <div>
           <SectionHeading
@@ -93,7 +93,7 @@ const AboutPage = () => (
     </section>
 
     {/* Values */}
-    <section className="bg-muted/40 px-6 py-16 md:py-24">
+    <section className="bg-muted/40 px-6 py-10 md:py-24">
       <div className="mx-auto max-w-5xl">
         <SectionHeading
           align="center"

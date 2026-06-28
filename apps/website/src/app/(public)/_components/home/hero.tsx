@@ -6,13 +6,13 @@ import Image from 'next/image'
 import { TAGLINE, TEL, waLink } from '@/config/site'
 
 const HERO_PILLS = [
-  { value: '500+', label: 'Events' },
+  { value: '300+', label: 'Events' },
   { value: '', label: 'Happy Clients' },
-  { value: '5+', label: 'Years' },
+  { value: '3+', label: 'Years' },
 ]
 
 export const Hero = () => (
-  <section className="relative flex min-h-[88vh] items-center justify-center overflow-hidden px-6 py-24">
+  <section className="relative flex min-h-80 items-center justify-center overflow-hidden px-6 py-6 sm:py-24 sm:min-h-[88vh]">
     <Image
       src="/services/marriage-decoration/cover.jpg"
       alt=""
@@ -24,7 +24,7 @@ export const Hero = () => (
     {/* cinematic dark overlay */}
     <div className="from-brand-ink/92 via-brand-brown/85 to-brand-copper/75 absolute inset-0 bg-linear-to-br" />
 
-    <div className="relative z-10 flex max-w-3xl flex-col items-center gap-6 text-center text-white">
+    <div className="relative z-10 flex max-w-3xl flex-col items-center gap-4 text-center text-white sm:gap-6">
       <h1 className="font-display text-4xl leading-tight font-bold sm:text-5xl md:text-6xl">
         {TAGLINE}
       </h1>

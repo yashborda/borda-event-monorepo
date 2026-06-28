@@ -33,8 +33,8 @@ export const SOCIAL_HANDLE = 'event.borda'
 
 /** Headline stats shown across the site (hero pills + dark stats band). */
 export const STATS = [
-  { value: 500, suffix: '+', label: 'Events Completed' },
-  { value: 300, suffix: '+', label: 'Happy Clients' },
+  { value: 300, suffix: '+', label: 'Events Completed' },
+  { value: 250, suffix: '+', label: 'Happy Clients' },
   { value: 24, suffix: '+', label: 'Service Types' },
-  { value: 5, suffix: '+', label: 'Years Experience' },
+  { value: 3, suffix: '+', label: 'Years Experience' },
 ] as const
