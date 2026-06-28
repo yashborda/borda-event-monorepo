@@ -292,7 +292,7 @@ export const ThemePriceBuckets = ({
         return (
           <div
             key={bucket.key}
-            className={cn('py-8', i % 2 === 0 ? 'bg-white' : 'bg-muted/30')}
+            className={cn('py-8', i % 2 === 0 ? 'bg-muted/50' : 'bg-muted/30')}
           >
             <div className="mx-auto max-w-6xl overflow-hidden scroll-smooth rounded-xl">
               {/* <div className="flex items-baseline gap-3 px-5 py-4">
