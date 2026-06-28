@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsEmail,
   IsOptional,
   IsString,
   IsUUID,
@@ -11,9 +12,22 @@ export class CreateInquiryDto {
   @MaxLength(255)
   name!: string;
 
+  // Phone OR email is required — enforced in WebsiteInquiriesService.create,
+  // since class-validator can't express "at least one of two" declaratively.
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  phone!: string;
+  phone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  service?: string;
 
   @IsOptional()
   @IsString()

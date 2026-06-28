@@ -116,11 +116,11 @@ const ThemeCoverGrid = ({ sections }: { sections: BucketSection[] }) => {
                 loading="lazy"
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
               />
-              {section.title && (
-                <span className="from-brand-ink/85 absolute inset-x-0 bottom-0 bg-linear-to-t to-transparent p-3 text-sm font-medium text-white">
+              {/* {section.title && (
+                <span className="from-brand-ink/85 absolute inset-x-0 bottom-0 bg-linear-to-t to-transparent p-3 text-xs font-medium text-white sm:text-sm">
                   {section.title}
                 </span>
-              )}
+              )} */}
             </>
           )
 
@@ -172,9 +172,7 @@ const ThemeRow = ({ section }: { section: BucketSection }) => {
   // Photo-only themes use the full row width, so show 4-up on desktop — each
   // tile is then a quarter-width square, matching the cover grid above. Beside a
   // video the photo strip only gets the wide (3fr) column, so it stays 3-up.
-  const perView = split
-    ? { base: 2, sm: 3, lg: 3 }
-    : { base: 2, sm: 3, lg: 4 }
+  const perView = split ? { base: 2, sm: 3, lg: 3 } : { base: 2, sm: 3, lg: 4 }
   // Mobile only: stack photos vertically in their own aspect-9/16 wrapper beside
   // the portrait video. On desktop photos are a horizontal strip of SQUARE tiles
   // (the natural, consistent look) and the video shrinks to match that strip's
@@ -251,7 +249,10 @@ export const ThemePriceBuckets = ({
         return (
           <div
             key={bucket.key}
-            className={cn('py-8', i % 2 === 0 ? 'bg-muted/50' : 'bg-muted/30')}
+            className={cn(
+              'py-2 md:py-8',
+              i % 2 === 0 ? 'bg-muted/50' : 'bg-muted/30'
+            )}
           >
             <div className="mx-auto max-w-6xl overflow-hidden scroll-smooth rounded-xl">
               {/* <div className="flex items-baseline gap-3 px-5 py-4">

@@ -13,7 +13,12 @@ export const inquiries = pgTable('inquiries', {
     onDelete: 'set null',
   }),
   name: varchar('name', { length: 255 }).notNull(),
-  phone: varchar('phone', { length: 20 }).notNull(),
+  // Phone OR email is required (enforced at the API/DTO layer); both nullable
+  // here so either can be the sole contact method.
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
+  // Service the visitor picked on the website enquiry form (free-text name).
+  service: varchar('service', { length: 255 }),
   message: text('message'),
   eventDate: timestamp('event_date', { withTimezone: true }),
   status: inquiryStatusEnum('status').default('new').notNull(),

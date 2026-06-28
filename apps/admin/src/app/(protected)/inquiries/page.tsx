@@ -62,8 +62,18 @@ const InquiriesPage = () => {
           >
             {i.name}
           </Link>
-          <p className="text-muted-foreground text-xs">{i.phone}</p>
+          <p className="text-muted-foreground text-xs">
+            {i.phone || i.email || '—'}
+          </p>
         </div>
+      ),
+    },
+    {
+      key: 'service',
+      header: 'Service',
+      minWidth: 150,
+      cell: (i) => (
+        <span className="text-muted-foreground">{i.service ?? '—'}</span>
       ),
     },
     {

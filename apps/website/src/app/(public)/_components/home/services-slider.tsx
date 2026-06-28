@@ -172,12 +172,10 @@ export const ServicesSlider = ({ slides }: ServicesSliderProps) => {
               slideRefs.current[i] = el
             }}
             // Mobile: a full-width snap page laying its (up to) 4 services in a
-            // 2×2 grid. Desktop: a single service card, ~half/third width.
+            // 2×2 grid. Tablet: ~2 cards; desktop: 4 cards per view.
             className={cn(
               'shrink-0 snap-start',
-              isMobile
-                ? 'grid w-full grid-cols-2 gap-3'
-                : 'w-[46%] lg:w-[31.5%]'
+              isMobile ? 'grid w-full grid-cols-2 gap-3' : 'w-[46%] lg:w-[23%]'
             )}
           >
             {page.map((slide) => (

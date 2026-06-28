@@ -25,6 +25,13 @@ import {
   waLink,
 } from '@/config/site'
 
+import { SERVICES } from '@/content/services'
+
+/** Today as yyyy-mm-dd, for the date input's `min` (no past dates). */
+const todayISO = () => new Date().toISOString().slice(0, 10)
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 const CONTACT_LINKS = [
   { Icon: IconPhone, label: PHONE, href: TEL },
   { Icon: IconBrandWhatsapp, label: 'Chat on WhatsApp', href: waLink() },
@@ -44,11 +51,30 @@ const ContactPage = () => {
     const form = new FormData(e.currentTarget)
     const name = String(form.get('name') ?? '').trim()
     const phone = String(form.get('phone') ?? '').trim()
+    const email = String(form.get('email') ?? '').trim()
+    const service = String(form.get('service') ?? '').trim()
     const message = String(form.get('message') ?? '').trim()
     const eventDate = String(form.get('eventDate') ?? '').trim()
 
-    if (!name || !phone) {
-      setError('Please enter your name and phone number.')
+    if (!name) {
+      setError('Please enter your name.')
+      return
+    }
+    // Phone OR email is required — at least one contact method.
+    if (!phone && !email) {
+      setError('Please provide a phone number or an email address.')
+      return
+    }
+    if (phone && phone.replace(/\D/g, '').length !== 10) {
+      setError('Phone number must be 10 digits.')
+      return
+    }
+    if (email && !EMAIL_RE.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+    if (eventDate && eventDate < todayISO()) {
+      setError('Event date must be in the future.')
       return
     }
 
@@ -58,7 +84,9 @@ const ContactPage = () => {
         method: 'POST',
         body: JSON.stringify({
           name,
-          phone,
+          ...(phone ? { phone } : {}),
+          ...(email ? { email } : {}),
+          ...(service ? { service } : {}),
           ...(message ? { message } : {}),
           ...(eventDate ? { eventDate } : {}),
         }),
@@ -158,19 +186,56 @@ const ContactPage = () => {
                       placeholder="Your name"
                     />
                   </div>
+                  <p className="text-muted-foreground -mt-1 text-xs">
+                    Add a phone number or an email — at least one so we can reach
+                    you.
+                  </p>
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="phone">Phone *</Label>
+                    <Label htmlFor="phone">Phone</Label>
                     <Input
                       id="phone"
                       name="phone"
                       type="tel"
-                      required
-                      placeholder="Your phone number"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="\d{10}"
+                      title="Enter a phone number"
+                      placeholder="phone number"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service">Service</Label>
+                    <select
+                      id="service"
+                      name="service"
+                      defaultValue=""
+                      className="border-input bg-background ring-offset-background focus-visible:ring-ring h-10 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    >
+                      <option value="">Select a service…</option>
+                      {SERVICES.map((s) => (
+                        <option key={s.slug} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
                     <Label htmlFor="eventDate">Event date</Label>
-                    <Input id="eventDate" name="eventDate" type="date" />
+                    <Input
+                      id="eventDate"
+                      name="eventDate"
+                      type="date"
+                      min={todayISO()}
+                    />
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="message">Message</Label>

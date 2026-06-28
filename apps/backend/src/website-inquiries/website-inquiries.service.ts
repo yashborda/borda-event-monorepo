@@ -10,6 +10,25 @@ export class WebsiteInquiriesService {
   constructor(private readonly drizzle: DrizzleService) {}
 
   async create(dto: CreateInquiryDto) {
+    // At least one contact method is required.
+    const phone = dto.phone?.trim() || undefined;
+    const email = dto.email?.trim() || undefined;
+    if (!phone && !email) {
+      throw new BadRequestException(
+        'Provide a phone number or an email address',
+      );
+    }
+    // When a phone is given it must be exactly 10 digits (ignoring spaces,
+    // dashes and a leading +country code is not accepted here by design).
+    if (phone) {
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length !== 10) {
+        throw new BadRequestException(
+          'Phone number must be 10 digits',
+        );
+      }
+    }
+
     // Validate the optional catalogue link so a bad id returns a clean 400
     // instead of a foreign-key violation.
     if (dto.catalogueId) {
@@ -31,7 +50,9 @@ export class WebsiteInquiriesService {
       .insert(inquiries)
       .values({
         name: dto.name,
-        phone: dto.phone,
+        phone: phone ?? null,
+        email: email ?? null,
+        service: dto.service?.trim() || null,
         message: dto.message,
         eventDate: dto.eventDate ? new Date(dto.eventDate) : null,
         catalogueId: dto.catalogueId ?? null,

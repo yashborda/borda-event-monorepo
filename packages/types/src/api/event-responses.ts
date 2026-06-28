@@ -147,7 +147,9 @@ export type ISocialPost = {
 export type IInquiry = {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
+  service: string | null;
   message: string | null;
   eventDate: string | null;
   status: InquiryStatus;

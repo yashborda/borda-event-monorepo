@@ -97,6 +97,8 @@ const InquiryDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <Field label="Name" value={inquiry.name} />
                 <Field label="Phone" value={inquiry.phone} />
+                <Field label="Email" value={inquiry.email} />
+                <Field label="Service" value={inquiry.service} />
                 <Field
                   label="Event Date"
                   value={inquiry.eventDate ? appDate(inquiry.eventDate) : '—'}

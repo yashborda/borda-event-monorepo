@@ -159,7 +159,7 @@ export const ThemeVideos = ({
             type="button"
             aria-label="Previous video"
             onClick={() => go(-1)}
-            className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 left-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white"
+            className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 left-2 z-10 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white sm:size-9"
           >
             <IconChevronLeft className="size-5" stroke={1.75} />
           </button>
@@ -167,7 +167,7 @@ export const ThemeVideos = ({
             type="button"
             aria-label="Next video"
             onClick={() => go(1)}
-            className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 right-2 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white"
+            className="border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute top-1/2 right-2 z-10 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white sm:size-9"
           >
             <IconChevronRight className="size-5" stroke={1.75} />
           </button>

@@ -259,7 +259,7 @@ export const PhotoSlider = ({
               aria-label="Previous photo"
               onClick={() => go(-1)}
               className={cn(
-                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-9 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white',
+                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-7 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white sm:size-9',
                 isVertical
                   ? 'top-2 left-1/2 -translate-x-1/2'
                   : 'top-1/2 left-2 -translate-y-1/2'
@@ -276,7 +276,7 @@ export const PhotoSlider = ({
               aria-label="Next photo"
               onClick={() => go(1)}
               className={cn(
-                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-9 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white',
+                'border-brand-copper/40 text-brand-copper hover:bg-brand-copper absolute z-10 flex size-7 items-center justify-center rounded-full border bg-white/90 shadow-md backdrop-blur transition-colors hover:text-white sm:size-9',
                 isVertical
                   ? 'bottom-2 left-1/2 -translate-x-1/2'
                   : 'top-1/2 right-2 -translate-y-1/2'
